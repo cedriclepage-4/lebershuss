@@ -4,16 +4,49 @@
 
   /* Tabs (Spelers / Teams op de klassementpagina) */
   document.querySelectorAll("[data-tabs]").forEach(function (groep) {
-    groep.querySelectorAll(".tab").forEach(function (knop) {
-      knop.addEventListener("click", function () {
-        groep.querySelectorAll(".tab").forEach(function (k) { k.classList.remove("actief"); });
-        knop.classList.add("actief");
-        document.querySelectorAll("[data-paneel]").forEach(function (p) {
-          p.classList.toggle("verborgen", p.dataset.paneel !== knop.dataset.tab);
-        });
+    function kies(knop, onthouden) {
+      groep.querySelectorAll(".tab").forEach(function (k) { k.classList.remove("actief"); });
+      knop.classList.add("actief");
+      document.querySelectorAll("[data-paneel]").forEach(function (p) {
+        p.classList.toggle("verborgen", p.dataset.paneel !== knop.dataset.tab);
       });
+      /* In het adres bijhouden welk tabblad open staat. Zo blijf je na het
+         verversen op hetzelfde tabblad staan — nodig voor de beamer, die de
+         hele avond dezelfde tabel moet tonen. */
+      if (onthouden && window.history.replaceState) {
+        window.history.replaceState(null, "", "#" + knop.dataset.tab);
+      }
+    }
+
+    groep.querySelectorAll(".tab").forEach(function (knop) {
+      knop.addEventListener("click", function () { kies(knop, true); });
     });
+
+    var gevraagd = (window.location.hash || "").replace("#", "");
+    if (gevraagd) {
+      var start = groep.querySelector('.tab[data-tab="' + gevraagd.replace(/[^a-z]/gi, "") + '"]');
+      if (start) kies(start, false);
+    }
   });
+
+  /* Beamermodus: ververst zichzelf, zodat de stand de hele avond meeloopt.
+     Wordt aangezet met ?beamer=1 in het adres — nooit zomaar voor spelers,
+     die kunnen net een formulier aan het invullen zijn. */
+  (function () {
+    if (!/[?&]beamer=1/.test(window.location.search)) return;
+    document.body.classList.add("beamer");
+    var SECONDEN = 20;
+    var teller = document.createElement("div");
+    teller.className = "beamer-teller";
+    document.body.appendChild(teller);
+    var rest = SECONDEN;
+    setInterval(function () {
+      if (document.hidden) return;              // niet verversen op de achtergrond
+      rest -= 1;
+      teller.textContent = "ververst over " + rest + "s";
+      if (rest <= 0) window.location.reload();
+    }, 1000);
+  })();
 
   /* Live zoeken in een lijst (data-zoek = CSS-selector van de tabel of het vak).
      Bij een tabel worden de rijen gefilterd, anders de directe kinderen. */
@@ -97,8 +130,10 @@
     var balk = document.getElementById("installeer");
     if (!balk) return;
 
-    var alApp = window.matchMedia("(display-mode: standalone)").matches
-      || window.navigator.standalone === true;
+    var alApp = window.navigator.standalone === true;
+    try {
+      alApp = alApp || window.matchMedia("(display-mode: standalone)").matches;
+    } catch (e) { /* oudere browser zonder matchMedia: dan tonen we de balk gewoon */ }
     if (alApp) return;
 
     try {

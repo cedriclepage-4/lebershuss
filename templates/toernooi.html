@@ -17,6 +17,8 @@
     <a class="knop primair" href="{{ url_for('toernooi_loting', toernooi_id=t['id']) }}">Naar loting</a>
     {% if is_organisator %}
     <a class="knop" href="{{ url_for('toernooi_beheer', toernooi_id=t['id']) }}">Beheren</a>
+    <a class="knop" href="{{ url_for('toernooi_detail', toernooi_id=t['id']) }}?beamer=1#stand"
+       title="Ververst zichzelf — zet dit venster op de beamer en laat het openstaan">📺 Beamermodus</a>
     {% endif %}
   </p>
   {% elif is_organisator %}

@@ -316,6 +316,21 @@ Terugzetten: hernoem het back-upbestand naar `shuss.db` en herstart.
 als je zelf via een ander adres werkt, zodat de QR-code naar het juiste adres
 wijst.
 
+## Op de beamer
+
+Op de toernooipagina staat voor organisatoren een knop **📺 Beamermodus**. Die
+opent dezelfde pagina met `?beamer=1` erachter en:
+
+- **ververst zichzelf om de 20 seconden**, dus de stand loopt de hele avond mee
+  zonder dat je iets moet doen (rechtsonder zie je aftellen);
+- **blijft op hetzelfde tabblad** staan — kies *Stand* of *Knockout* en dat blijft
+  zo na elke verversing, want het tabblad staat mee in het adres;
+- **haalt alles weg wat afleidt** (menu, voettekst, je eigen wedstrijdbalk) en
+  toont de tabellen groter, zodat ze achteraan de zaal leesbaar zijn.
+
+Zet het venster op volledig scherm (F11) en laat het gerust openstaan. Staat het
+tabblad op de achtergrond, dan ververst het niet — zo verspil je niets.
+
 ## Op je startscherm zetten
 
 De site heeft een manifest, een service worker en app-iconen, dus je kan ze op je
