@@ -1,6 +1,6 @@
-# 🥃 Lebershuss Tonzent
+# 🥃 Leberschuss Tonzent
 
-Webapplicatie voor de shusscompetitie van jeugdhuis Tonzent: leden bekijken de
+Webapplicatie voor de schusscompetitie van jeugdhuis Tonzent: leden bekijken de
 klassementen, organisatoren plannen wedstrijden en vullen resultaten in.
 Volledig in het Nederlands, draait lokaal, zonder externe diensten.
 
@@ -322,7 +322,7 @@ De site heeft een manifest, een service worker en app-iconen, dus je kan ze op j
 gsm op het startscherm zetten:
 
 - *iPhone (Safari)*: deelknop → **Zet op beginscherm**. Opent zonder browserbalk,
-  met het Lebershuss-logo. Werkt gewoon op het netwerk van het jeugdhuis.
+  met het Leberschuss-logo. Werkt gewoon op het netwerk van het jeugdhuis.
 - *Android (Chrome)*: onderaan de site verschijnt vanzelf een balkje met een
   knop **Installeren**. Liever via het menu? ⋮ → **App installeren**.
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Toernooimotor van Lebershuss Tonzent.
+Toernooimotor van Leberschuss Tonzent.
 
 Formaat (naar het model van de nieuwe Champions League):
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Databaselaag van Lebershuss Tonzent (SQLite) — schema v5 (liga + toernooien).
+"""Databaselaag van Leberschuss Tonzent (SQLite) — schema v5 (liga + toernooien).
 
 Nieuw in v5
 -----------

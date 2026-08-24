@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ELO-motor voor Lebershuss Tonzent.
+ELO-motor voor Leberschuss Tonzent.
 
 Een wedstrijd is altijd 2 tegen 2. Elke speler heeft een eigen ELO-rating,
 en elk team (elk duo dat ooit samen gespeeld heeft) heeft ook een ELO-rating.

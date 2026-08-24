@@ -1,4 +1,4 @@
-/* Shuss League — front-end gedrag */
+/* Schuss League — front-end gedrag */
 (function () {
   "use strict";
 
@@ -125,7 +125,7 @@
     window.addEventListener("beforeinstallprompt", function (e) {
       e.preventDefault();
       bewaard = e;
-      toon("📲 Zet Lebershuss op je startscherm — dan opent het als een app.", true);
+      toon("📲 Zet Leberschuss op je startscherm — dan opent het als een app.", true);
     });
 
     knop.addEventListener("click", function () {
@@ -146,6 +146,9 @@
     var isIOS = /iphone|ipad|ipod/i.test(window.navigator.userAgent)
       || (window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
     if (isIOS) {
+      /* Geen installatieknop mogelijk, dus enkel uitleg. "Niet nu" past hier
+         niet als tekst — je stelt niets uit, je hebt het gelezen of niet. */
+      weg.textContent = "Oké";
       toon("📲 Op je startscherm zetten? Tik op het deel-icoon onderaan en kies "
            + "“Zet op beginscherm”.", false);
     }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0f172a">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>{% block titel %}Lebershuss Tonzent{% endblock %} · Lebershuss Tonzent</title>
+  <title>{% block titel %}Leberschuss Tonzent{% endblock %} · Leberschuss Tonzent</title>
   <link rel="stylesheet" href="{{ url_for('statisch', bestand='style.css') }}">
   <link rel="icon" href="{{ url_for('statisch', bestand=logo_bestand) }}">
   {# installeerbaar als app op de gsm #}
@@ -13,15 +13,15 @@
   <link rel="apple-touch-icon" href="{{ url_for('statisch', bestand='apple-touch-icon.png') }}">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Lebershuss">
+  <meta name="apple-mobile-web-app-title" content="Leberschuss">
 </head>
 <body>
   <header class="topbar">
     <div class="wrap topbar-inner">
       <a class="logo" href="{{ url_for('index') if league_toegankelijk else url_for('toernooien') }}">
-        <img class="logo-beeld" src="{{ url_for('statisch', bestand=logo_bestand) }}" alt="Lebershuss Tonzent logo">
+        <img class="logo-beeld" src="{{ url_for('statisch', bestand=logo_bestand) }}" alt="Leberschuss Tonzent logo">
         <span>
-          <strong>Lebershuss <span class="merk-org">Tonzent</span></strong>
+          <strong>Leberschuss <span class="merk-org">Tonzent</span></strong>
           <small>league &amp; toernooien van jeugdhuis Tonzent</small>
         </span>
       </a>
@@ -87,7 +87,7 @@
 
   <footer class="voet">
     <div class="wrap">
-      Lebershuss Tonzent · gemaakt door Jeugdhuis Tonzent Kampenhout
+      Leberschuss Tonzent · gemaakt door Jeugdhuis Tonzent Kampenhout
       {% if not is_organisator %}
         <a class="voet-organisatie" href="{{ url_for('admin') }}">⚙ Organisatie</a>
       {% endif %}

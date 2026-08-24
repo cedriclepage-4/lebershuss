@@ -1,5 +1,5 @@
 /* ================================================================
-   Shuss League — huisstijl: professioneel maar gezellig
+   Schuss League — huisstijl: professioneel maar gezellig
    ================================================================ */
 
 :root {
@@ -19,6 +19,12 @@
 }
 
 * { box-sizing: border-box; }
+
+/* Het hidden-attribuut moet altijd winnen. Zonder deze regel blijft een element
+   met `hidden` toch staan zodra een eigen regel er een display aan geeft
+   (bv. .knop of .installeer-balk) — de browser zijn eigen regel is namelijk
+   zwakker dan de onze. */
+[hidden] { display: none !important; }
 
 body {
   margin: 0;

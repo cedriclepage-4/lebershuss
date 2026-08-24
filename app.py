@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Lebershuss Tonzent — webapplicatie voor de shusscompetitie van jeugdhuis Tonzent.
+Leberschuss Tonzent — webapplicatie voor de schusscompetitie van jeugdhuis Tonzent.
 
 Starten:
     pip install flask
     python app.py
 Daarna surfen naar http://localhost:5000
 
-Standaard beheerderswachtwoord: "lebershuss" (wijzig meteen via Organisatie > Instellingen!)
+Standaard beheerderswachtwoord: "leberschuss" (wijzig meteen via Organisatie > Instellingen!)
 Spelers maken zelf een account aan, vormen zelf teams (met uitnodigingen) en
 melden zelf hun uitslagen; organisatoren beheren seizoenen, speeldagen en
 wedstrijden.
@@ -1468,7 +1468,7 @@ def registreren():
                             ROL_EIGENAAR if eerste else ROL_SPELER, START_ELO))
                 db.commit()
                 session["speler_id"] = nummer
-                flash(f"Welkom bij Lebershuss Tonzent, {bijnaam or naam}! Je "
+                flash(f"Welkom bij Leberschuss Tonzent, {bijnaam or naam}! Je "
                       f"spelersnummer is #{nummer} en je start op {START_ELO:.0f} ELO. "
                       "Maak of aanvaard een team om mee te spelen.", "ok")
                 if eerste:
@@ -2857,7 +2857,7 @@ def basisadres_opslaan():
     adres = (request.form.get("basisadres") or "").strip().rstrip("/")
     if adres and not adres.startswith(("http://", "https://")):
         flash("Een basisadres begint met http:// of https:// — bijvoorbeeld "
-              "https://lebershuss.tonzent.be", "fout")
+              "https://leberschuss.tonzent.be", "fout")
     else:
         zet_instelling(db, "basisadres", adres)
         db.commit()
@@ -3424,16 +3424,16 @@ def start(host="0.0.0.0", poort=5000):
         app.run(host=host, port=poort, debug=False, threaded=True)
         return
 
-    print("Lebershuss Tonzent draait op:")
+    print("Leberschuss Tonzent draait op:")
     for adres in _eigen_adressen(poort):
         print("   ", adres)
-    serve(app, host=host, port=poort, threads=8, ident="Lebershuss Tonzent")
+    serve(app, host=host, port=poort, threads=8, ident="Leberschuss Tonzent")
 
 
 if __name__ == "__main__":
     import argparse
 
-    p = argparse.ArgumentParser(description="Lebershuss Tonzent")
+    p = argparse.ArgumentParser(description="Leberschuss Tonzent")
     p.add_argument("--poort", type=int, default=int(os.environ.get("POORT", 5000)))
     p.add_argument("--host", default=os.environ.get("HOST", "0.0.0.0"))
     p.add_argument("--eigenaar", metavar="NAAM_OF_NUMMER",

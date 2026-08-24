@@ -1,4 +1,4 @@
-# Lebershuss Tonzent online zetten
+# Leberschuss Tonzent online zetten
 
 Stap voor stap, van een lege server tot een werkende site op je eigen domein.
 Reken op **een uurtje** de eerste keer.
@@ -22,7 +22,7 @@ Je hebt lokaal al een git-repo. Maak op github.com een **lege privérepo** en
 duw je code er naartoe (vervang `JOUWNAAM`):
 
 ```bash
-git remote add origin git@github.com:JOUWNAAM/lebershuss.git
+git remote add origin git@github.com:JOUWNAAM/leberschuss.git
 git branch -M main
 git push -u origin main
 ```
@@ -77,7 +77,7 @@ Bij je domeinregistrar zet je twee DNS-records:
 Dit kan tot een uur duren. Testen:
 
 ```bash
-ping lebershuss.be
+ping leberschuss.be
 ```
 
 Zolang dit niet het juiste IP toont, heeft stap 6 (https) geen zin.
@@ -120,7 +120,7 @@ Haal daarna de code binnen (let op: `git@github.com:` met een dubbele punt, geen
 `https://`) en installeer de pakketten:
 
 ```bash
-git clone git@github.com:JOUWNAAM/lebershuss.git site
+git clone git@github.com:JOUWNAAM/leberschuss.git site
 cd site
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
@@ -130,7 +130,7 @@ exit          # terug naar root
 De eerste keer vraagt hij of je github.com vertrouwt: typ `yes`.
 
 > **Liever geen gedoe met sleutels?** Maak de repo publiek; dan werkt
-> `git clone https://github.com/JOUWNAAM/lebershuss.git site` zonder meer. Er
+> `git clone https://github.com/JOUWNAAM/leberschuss.git site` zonder meer. Er
 > staan geen geheimen in: de database, `.secret_key` en de profielfoto's zitten
 > in `.gitignore` en wachtwoorden worden gehasht opgeslagen.
 
@@ -146,7 +146,7 @@ Plak dit:
 
 ```ini
 [Unit]
-Description=Lebershuss Tonzent
+Description=Leberschuss Tonzent
 After=network.target
 
 [Service]
@@ -175,14 +175,14 @@ systemctl status shuss          # hoort "active (running)" te tonen
 nano /etc/nginx/sites-available/shuss
 ```
 
-> ⚠️ **Vervang `lebershuss.be` hieronder door jouw eigen domein.** Vergeet je dat,
+> ⚠️ **Vervang `leberschuss.be` hieronder door jouw eigen domein.** Vergeet je dat,
 > dan lukt certbot straks niet: *"Could not automatically find a matching server
 > block"*. Je krijgt dan wel een certificaat, maar het wordt niet geïnstalleerd.
 
 ```nginx
 server {
     listen 80;
-    server_name lebershuss.be www.lebershuss.be;
+    server_name leberschuss.be www.leberschuss.be;
 
     client_max_body_size 4M;      # profielfoto's tot 3 MB
 
@@ -204,13 +204,13 @@ rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 ```
 
-Surf nu naar `http://lebershuss.be` — de site hoort te verschijnen.
+Surf nu naar `http://leberschuss.be` — de site hoort te verschijnen.
 
 Dan het gratis certificaat:
 
 ```bash
 apt install -y certbot python3-certbot-nginx
-certbot --nginx -d lebershuss.be -d www.lebershuss.be
+certbot --nginx -d leberschuss.be -d www.leberschuss.be
 ```
 
 Kies **redirect** wanneer hij vraagt of http naar https moet. Certbot vernieuwt
@@ -233,10 +233,10 @@ systemctl daemon-reload && systemctl restart shuss
 
 ## 8. Eerste gebruik
 
-1. Surf naar `https://lebershuss.be/registreren` en maak **jouw** account aan.
+1. Surf naar `https://leberschuss.be/registreren` en maak **jouw** account aan.
    Het eerste account is automatisch de eigenaar.
 2. Ga naar *Organisatie → Instellingen* en vul bij **Adres van de site**
-   `https://lebershuss.be` in.
+   `https://leberschuss.be` in.
 3. Voeg de spelers toe, stel de teams samen, en zet *Accounts opeisen* open
    wanneer het toernooi begint.
 

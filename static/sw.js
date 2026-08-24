@@ -1,4 +1,4 @@
-/* Service worker van Lebershuss Tonzent.
+/* Service worker van Leberschuss Tonzent.
  *
  * De site draait op de laptop in het jeugdhuis en de gegevens veranderen de hele
  * avond door. Daarom: pagina's ALTIJD eerst van het netwerk halen, zodat je nooit
@@ -9,7 +9,7 @@
  * style.css, app.js en de iconen berekend is. Verandert er één van, dan krijgt
  * de cache een nieuwe naam en wordt de oude opgeruimd — bezoekers zien je
  * aanpassingen dus meteen na een update, zonder iets te moeten wissen. */
-const VERSIE = "lebershuss-__VERSIE__";
+const VERSIE = "leberschuss-__VERSIE__";
 const VASTE_BESTANDEN = [
   "/static/style.css",
   "/static/app.js",

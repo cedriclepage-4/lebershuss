@@ -75,7 +75,7 @@
      <code>{{ gezien_adres }}</code> werkt terwijl de spelers een domeinnaam gebruiken.</p>
   <form method="post" action="{{ url_for('basisadres_opslaan') }}" class="rij-form">
     <input type="url" name="basisadres" value="{{ basisadres }}"
-           placeholder="https://lebershuss.tonzent.be (leeg = automatisch)">
+           placeholder="https://leberschuss.tonzent.be (leeg = automatisch)">
     <button type="submit" class="knop primair">Opslaan</button>
   </form>
   <p class="stil klein-tekst">Nu in gebruik: <code>{{ basisadres or gezien_adres }}</code>
