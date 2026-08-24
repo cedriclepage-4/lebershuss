@@ -1,3 +1,6 @@
 flask>=3.0
 waitress>=3.0
 segno>=1.6
+# Enkel nodig op de server: meerdere werkprocessen tegelijk (zie DEPLOY.md).
+# Lokaal draaien kan gewoon met waitress, via `python app.py`.
+gunicorn>=21.2; sys_platform != "win32"

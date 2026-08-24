@@ -266,6 +266,17 @@ def verbind(pad: str = DB_PATH) -> sqlite3.Connection:
     conn = sqlite3.connect(pad)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    # WAL: lezers en schrijvers blokkeren elkaar niet meer. Zonder dit staat
+    # iedereen die het klassement bekijkt te wachten zodra er een uitslag
+    # binnenkomt — merkbaar wanneer een hele zaal tegelijk ververst.
+    conn.execute("PRAGMA journal_mode = WAL")
+    # Bij zoveel volk kan een schrijfbeurt even moeten wachten op een andere;
+    # 15 seconden geduld is ruim genoeg en voorkomt "database is locked".
+    conn.execute("PRAGMA busy_timeout = 15000")
+    # NORMAL i.p.v. FULL: veel minder wachten op de schijf. Bij een stroompanne
+    # kan je in het slechtste geval de allerlaatste uitslag kwijt zijn — die
+    # typ je dan gewoon opnieuw in.
+    conn.execute("PRAGMA synchronous = NORMAL")
     return conn
 
 

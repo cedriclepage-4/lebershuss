@@ -547,6 +547,49 @@ def elo_verloop(db, entity_id, entity_type="speler"):
     return punten
 
 
+def actieve_wedstrijd(db, speler_id):
+    """De eerstvolgende wedstrijd van deze speler, voor de balk onderaan.
+
+    Zo hoeft niemand te zoeken waar hij moet zijn: één tik brengt hem naar het
+    formulier om de uitslag te melden.
+    """
+    g_ = db.execute("""
+        SELECT g.id, g.scheduled_at, g.tournament_id, g.team1_id, g.team2_id,
+               tn.name AS toernooi, loc.name AS locatie,
+               t1.player1_id AS a1, t1.player2_id AS a2,
+               t2.player1_id AS b1, t2.player2_id AS b2
+        FROM games g
+        JOIN teams t1 ON t1.id = g.team1_id
+        JOIN teams t2 ON t2.id = g.team2_id
+        LEFT JOIN tournaments tn ON tn.id = g.tournament_id
+        LEFT JOIN tournament_locations loc ON loc.id = g.location_id
+        WHERE g.status = 'gepland'
+          AND ? IN (t1.player1_id, t1.player2_id, t2.player1_id, t2.player2_id)
+        ORDER BY g.scheduled_at, g.id LIMIT 1
+    """, (speler_id,)).fetchone()
+    if not g_:
+        return None
+    # Een leaguewedstrijd tonen we niet zolang dat gedeelte dicht staat.
+    if g_["tournament_id"] is None and not league_toegankelijk():
+        return None
+
+    eigen = g_["team1_id"] if speler_id in (g_["a1"], g_["a2"]) else g_["team2_id"]
+    tegen = g_["team2_id"] if eigen == g_["team1_id"] else g_["team1_id"]
+    # Enkel de naam van dié tegenstander ophalen: deze functie draait bij élke
+    # paginaweergave van een ingelogde speler.
+    naam_rij = db.execute("SELECT name FROM teams WHERE id = ?", (tegen,)).fetchone()
+    gemeld = db.execute("SELECT 1 FROM game_reports WHERE game_id = ? AND team_id = ?",
+                        (g_["id"], eigen)).fetchone() is not None
+    if g_["tournament_id"]:
+        doel = url_for("toernooi_detail", toernooi_id=g_["tournament_id"])
+    else:
+        doel = url_for("speler_profiel", speler_id=speler_id) + "#melden"
+    return {"tegenstander": naam_rij["name"] if naam_rij else "?",
+            "locatie": g_["locatie"],
+            "wanneer": g_["scheduled_at"], "toernooi": g_["toernooi"],
+            "gemeld": gemeld, "url": doel, "game_id": g_["id"]}
+
+
 def wedstrijd_context(g_):
     """Waar hoort deze wedstrijd bij? Geeft label, soort en link terug."""
     if g_["toernooi"]:
@@ -963,6 +1006,17 @@ def filter_datum(iso):
     return f"{d.day} {MAANDEN[d.month - 1]} {d.year}, {d:%H:%M}"
 
 
+@app.template_filter("uur")
+def filter_uur(iso):
+    """Enkel het uur — genoeg voor de balk met je eerstvolgende wedstrijd."""
+    if not iso:
+        return "—"
+    try:
+        return f"{datetime.fromisoformat(iso):%H:%M}"
+    except (ValueError, TypeError):
+        return iso
+
+
 @app.template_filter("dag")
 def filter_dag(iso):
     if not iso:
@@ -1027,10 +1081,21 @@ def extra_context():
     # Zonder league is er maar één deel; dan is alles wat geen toernooi is
     # (profielen, inloggen …) toch onder "toernooi" te vinden.
     sectie = "toernooi" if (pad.startswith("/toernooi") or league_uit) else "liga"
+    # De balk met je eerstvolgende wedstrijd: enkel voor wie ingelogd is, en niet
+    # bij statische bestanden (die hoeven geen databasevraag).
+    nu_spelen = None
+    if session.get("speler_id") and request.endpoint not in (
+            None, "statisch", "media", "service_worker", "manifest"):
+        try:
+            nu_spelen = actieve_wedstrijd(get_db(), session["speler_id"])
+        except Exception:
+            nu_spelen = None            # nooit een pagina laten crashen hierdoor
+
     return {"logo_bestand": naam, "sectie": sectie,
             "league_zichtbaar": league_zichtbaar(),
             "league_toegankelijk": league_toegankelijk(),
-            "claim_venster_open": claim_open()}
+            "claim_venster_open": claim_open(),
+            "nu_spelen": nu_spelen}
 
 
 def seizoen_status(s):

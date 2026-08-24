@@ -103,6 +103,20 @@
     </div>
   </footer>
 
+  {# Vaste balk onderaan met je eerstvolgende wedstrijd — één tik en je staat
+     bij het meldformulier. Verschijnt enkel als je effectief moet spelen. #}
+  {% if nu_spelen %}
+  <a class="nu-balk {{ 'nu-balk-gemeld' if nu_spelen.gemeld }}" href="{{ nu_spelen.url }}">
+    <span class="nu-icoon">{{ '⏳' if nu_spelen.gemeld else '🥅' }}</span>
+    <span class="nu-tekst">
+      <strong>{% if nu_spelen.gemeld %}Wachten op de tegenstander{% else %}Jouw wedstrijd{% endif %}</strong>
+      <small>tegen {{ nu_spelen.tegenstander }}{% if nu_spelen.locatie %} · {{ nu_spelen.locatie }}{% endif %}
+        · {{ nu_spelen.wanneer|uur }}</small>
+    </span>
+    <span class="nu-actie">{{ 'Bekijken' if nu_spelen.gemeld else 'Uitslag melden' }} ›</span>
+  </a>
+  {% endif %}
+
   <script src="{{ url_for('statisch', bestand='app.js') }}"></script>
   <script>
     /* Zo kan de site als app op het startscherm gezet worden. Browsers doen dit

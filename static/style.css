@@ -617,6 +617,36 @@ input[type="file"] { padding: 7px 10px; }
   .scherm-teller { justify-content: center; }
 }
 
+/* ------------------------------------ vaste balk: jouw volgende wedstrijd -- */
+.nu-balk {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: var(--navy-donker); color: #fff; text-decoration: none;
+  box-shadow: 0 -4px 20px rgba(15, 23, 42, .28);
+  border-top: 3px solid var(--amber);
+}
+.nu-balk-gemeld { border-top-color: var(--groen); }
+.nu-icoon { font-size: 1.5rem; flex: 0 0 auto; }
+.nu-tekst { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.nu-tekst strong { font-size: .98rem; }
+.nu-tekst small {
+  color: #cbd5e1; font-size: .82rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nu-actie {
+  flex: 0 0 auto; background: var(--amber); color: var(--navy-donker);
+  font-weight: 700; font-size: .86rem; padding: 8px 14px; border-radius: 999px;
+}
+.nu-balk-gemeld .nu-actie { background: #e2e8f0; }
+/* Ruimte onderaan, zodat de balk de voettekst niet bedekt. */
+body:has(.nu-balk) .voet { padding-bottom: 92px; }
+
+@media (max-width: 560px) {
+  .nu-actie { font-size: .8rem; padding: 7px 11px; }
+  .nu-tekst strong { font-size: .92rem; }
+}
+
 /* Balkje onderaan: de site op je startscherm zetten. */
 .installeer-balk {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
