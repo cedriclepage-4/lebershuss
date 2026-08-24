@@ -89,6 +89,68 @@
     veld.addEventListener("input", herteken);
   });
 
+  /* De site op het startscherm zetten.
+     Android/Chrome geeft ons een echte installatieknop via 'beforeinstallprompt'.
+     Safari op iPhone kent dat niet: daar moet het via het deelmenu, dus tonen we
+     enkel een korte uitleg. Draait de site al als app, dan zwijgen we. */
+  (function () {
+    var balk = document.getElementById("installeer");
+    if (!balk) return;
+
+    var alApp = window.matchMedia("(display-mode: standalone)").matches
+      || window.navigator.standalone === true;
+    if (alApp) return;
+
+    try {
+      if (window.localStorage.getItem("installeer-weg") === "1") return;
+    } catch (e) { /* privémodus: dan tonen we ze gewoon */ }
+
+    var tekst = document.getElementById("installeer-tekst");
+    var knop = document.getElementById("installeer-knop");
+    var weg = document.getElementById("installeer-weg");
+    var bewaard = null;
+
+    function toon(boodschap, metKnop) {
+      tekst.textContent = boodschap;
+      knop.hidden = !metKnop;
+      balk.hidden = false;
+    }
+
+    weg.addEventListener("click", function () {
+      balk.hidden = true;
+      try { window.localStorage.setItem("installeer-weg", "1"); } catch (e) {}
+    });
+
+    /* Android, Chrome, Edge … */
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault();
+      bewaard = e;
+      toon("📲 Zet Lebershuss op je startscherm — dan opent het als een app.", true);
+    });
+
+    knop.addEventListener("click", function () {
+      if (!bewaard) return;
+      bewaard.prompt();
+      bewaard.userChoice.then(function () {
+        bewaard = null;
+        balk.hidden = true;
+      });
+    });
+
+    window.addEventListener("appinstalled", function () {
+      balk.hidden = true;
+      try { window.localStorage.setItem("installeer-weg", "1"); } catch (e) {}
+    });
+
+    /* iPhone en iPad: geen knop mogelijk, dus uitleggen hoe het wél gaat. */
+    var isIOS = /iphone|ipad|ipod/i.test(window.navigator.userAgent)
+      || (window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
+    if (isIOS) {
+      toon("📲 Op je startscherm zetten? Tik op het deel-icoon onderaan en kies "
+           + "“Zet op beginscherm”.", false);
+    }
+  })();
+
   /* Bevestiging vragen bij gevoelige formulieren */
   document.querySelectorAll("form[data-confirm]").forEach(function (formulier) {
     formulier.addEventListener("submit", function (e) {

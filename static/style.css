@@ -611,6 +611,15 @@ input[type="file"] { padding: 7px 10px; }
   .scherm-teller { justify-content: center; }
 }
 
+/* Balkje onderaan: de site op je startscherm zetten. */
+.installeer-balk {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  justify-content: center; margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, .12); font-size: .88rem;
+}
+.installeer-balk .knop { margin-top: 0; }
+.installeer-balk .stil-knop { background: transparent; border-color: transparent; opacity: .7; }
+
 /* Aan-uitvinkje met tekst ernaast (bv. het leaguegedeelte tonen). */
 .schakel { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; cursor: pointer; }
 .schakel input { width: 20px; height: 20px; margin: 0; flex: 0 0 auto; accent-color: var(--amber-donker); }

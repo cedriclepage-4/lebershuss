@@ -323,9 +323,13 @@ gsm op het startscherm zetten:
 
 - *iPhone (Safari)*: deelknop → **Zet op beginscherm**. Opent zonder browserbalk,
   met het Lebershuss-logo. Werkt gewoon op het netwerk van het jeugdhuis.
-- *Android (Chrome)*: menu ⋮ → **Toevoegen aan startscherm**. Je krijgt een
-  snelkoppeling; de volwaardige installatie (zonder browserbalk) vraagt https en
-  komt er dus pas als de site ooit ergens gehost wordt.
+- *Android (Chrome)*: onderaan de site verschijnt vanzelf een balkje met een
+  knop **Installeren**. Liever via het menu? ⋮ → **App installeren**.
+
+Draait de site nog zonder https (bv. rechtstreeks op een laptop in het
+jeugdhuis), dan tonen browsers die installatieknop niet — dat is een regel van
+de browser, niet van deze site. Op een echt domein met certificaat werkt het
+wel.
 
 ## Tips voor gebruik in het jeugdhuis
 

@@ -14,6 +14,7 @@ wedstrijden.
 """
 
 import hashlib
+import json
 import os
 import re
 import secrets
@@ -1086,8 +1087,23 @@ def service_worker():
 
 @app.route("/manifest.webmanifest")
 def manifest():
-    return send_from_directory(STATIC_MAP, "manifest.webmanifest",
-                               mimetype="application/manifest+json")
+    """Het manifest maakt de site installeerbaar als app op de gsm.
+
+    We serveren het via een route (en niet als vast bestand), omdat de
+    startpagina afhangt van de instellingen: staat de league uit, dan is dat de
+    toernooipagina. Een start_url die doorverwijst, keurt Chrome soms af — dan
+    verschijnt de installatieknop niet.
+    """
+    with open(os.path.join(STATIC_MAP, "manifest.webmanifest"), encoding="utf-8") as f:
+        gegevens = json.load(f)
+    start = "/" if league_zichtbaar() else url_for("toernooien")
+    gegevens["start_url"] = start
+    gegevens["shortcuts"] = [s for s in gegevens.get("shortcuts", [])
+                             if league_zichtbaar() or s["url"] != "/"]
+    antwoord = app.response_class(json.dumps(gegevens, ensure_ascii=False, indent=2),
+                                  mimetype="application/manifest+json")
+    antwoord.headers["Cache-Control"] = "no-cache"
+    return antwoord
 
 
 @app.route("/media/<bestand>")

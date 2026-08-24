@@ -87,10 +87,19 @@
 
   <footer class="voet">
     <div class="wrap">
-      Lebershuss Tonzent · gemaakt met bloed, zweet en AI in Jeugdhuis Tonzent Kampenhout
+      Lebershuss Tonzent · gemaakt door Jeugdhuis Tonzent Kampenhout
       {% if not is_organisator %}
         <a class="voet-organisatie" href="{{ url_for('admin') }}">⚙ Organisatie</a>
       {% endif %}
+    </div>
+
+    {# Installatiehulp. Verschijnt enkel als de site nog niet als app draait:
+       op Android met de echte installatieknop, op iPhone met een korte uitleg
+       (Safari heeft geen knop, daar moet het via het deelmenu). #}
+    <div class="wrap installeer-balk" id="installeer" hidden>
+      <span id="installeer-tekst"></span>
+      <button type="button" class="knop klein" id="installeer-knop" hidden>Installeren</button>
+      <button type="button" class="knop klein stil-knop" id="installeer-weg">Niet nu</button>
     </div>
   </footer>
 
