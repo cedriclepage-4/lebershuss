@@ -1,0 +1,794 @@
+/* ================================================================
+   Shuss League — huisstijl: professioneel maar gezellig
+   ================================================================ */
+
+:root {
+  --amber: #f59e0b;
+  --amber-donker: #d97706;
+  --navy: #1e293b;
+  --navy-donker: #0f172a;
+  --inkt: #1f2937;
+  --stil: #6b7280;
+  --lijn: #e5e7eb;
+  --fond: #f8f6f1;
+  --kaart: #ffffff;
+  --groen: #16a34a;
+  --rood: #dc2626;
+  --radius: 14px;
+  --schaduw: 0 1px 3px rgba(15, 23, 42, .08), 0 4px 14px rgba(15, 23, 42, .06);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--fond);
+  color: var(--inkt);
+  line-height: 1.55;
+}
+
+.wrap { max-width: 1000px; margin: 0 auto; padding: 0 20px; }
+
+/* ------------------------------------------------------- topbar -- */
+.topbar {
+  background: linear-gradient(135deg, var(--navy-donker), var(--navy));
+  color: #fff;
+  border-bottom: 4px solid var(--amber);
+}
+.topbar-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px; padding-top: 14px; padding-bottom: 14px;
+}
+.logo { display: flex; align-items: center; gap: 12px; color: #fff; text-decoration: none; }
+.logo-glas { font-size: 2rem; }
+.logo strong { display: block; font-size: 1.25rem; letter-spacing: .3px; }
+.merk-org { color: var(--amber); }
+.logo small { display: block; color: #cbd5e1; font-size: .72rem; }
+.nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.nav a {
+  color: #e2e8f0; text-decoration: none; padding: 8px 14px;
+  border-radius: 999px; font-size: .92rem; transition: background .15s;
+}
+.nav a:hover { background: rgba(255, 255, 255, .12); }
+.nav a.actief { background: var(--amber); color: var(--navy-donker); font-weight: 600; }
+.nav-admin { border: 1px solid rgba(255, 255, 255, .25); }
+.nav-uit { opacity: .8; }
+
+/* --------------------------------------------------------- held -- */
+.held { padding: 34px 0 18px; }
+.held h1 { margin: 0 0 6px; font-size: 1.9rem; color: var(--navy-donker); }
+.held p { margin: 0; color: var(--stil); max-width: 640px; }
+.held-cijfers { display: flex; gap: 28px; margin-top: 18px; flex-wrap: wrap; }
+/* Knoppenrij onder de kop: extra lucht boven, en onderling ruimte tussen de
+   knoppen — ook wanneer ze op een smal scherm onder elkaar vallen. */
+.held .ruimte-boven {
+  margin-top: 22px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+}
+.cijfer strong { display: block; font-size: 1.6rem; color: var(--amber-donker); }
+.cijfer span { font-size: .82rem; color: var(--stil); }
+
+/* ------------------------------------------------------- kaarten -- */
+.kaart {
+  background: var(--kaart); border-radius: var(--radius);
+  box-shadow: var(--schaduw); padding: 20px; margin: 14px 0;
+}
+.kaart.leeg { text-align: center; color: var(--stil); padding: 36px 20px; }
+.kaart h3 { margin-top: 0; color: var(--navy-donker); }
+.sectiekop { margin: 30px 0 4px; font-size: 1.25rem; color: var(--navy-donker); }
+.maandkop { margin: 20px 0 2px; font-size: .95rem; color: var(--stil); text-transform: uppercase; letter-spacing: .6px; }
+
+/* --------------------------------------------------------- tabs -- */
+.tabs { display: flex; gap: 8px; margin-top: 20px; }
+.tab {
+  border: 1px solid var(--lijn); background: #fff; color: var(--stil);
+  padding: 9px 22px; border-radius: 999px; font-size: .95rem; cursor: pointer;
+}
+.tab.actief { background: var(--navy-donker); border-color: var(--navy-donker); color: #fff; font-weight: 600; }
+.paneel.verborgen { display: none; }
+
+/* -------------------------------------------------------- tabellen -- */
+.tabel { width: 100%; border-collapse: collapse; font-size: .95rem; }
+.tabel th {
+  text-align: left; font-size: .75rem; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--stil); border-bottom: 2px solid var(--lijn); padding: 8px 10px;
+}
+.tabel td { padding: 10px; border-bottom: 1px solid var(--lijn); }
+.tabel tbody tr:hover { background: #fdf8ee; }
+.tabel.compact th, .tabel.compact td { padding: 6px 8px; }
+.kol-rang { width: 44px; text-align: center; }
+td.kol-rang { font-weight: 600; }
+.kol-num, .kol-elo { text-align: right; width: 90px; }
+.kol-pct { width: 160px; }
+.naam { font-weight: 600; color: var(--navy-donker); }
+.elo-badge {
+  background: var(--navy-donker); color: var(--amber); font-weight: 700;
+  padding: 3px 10px; border-radius: 999px; font-variant-numeric: tabular-nums;
+}
+.pct-balk { background: var(--lijn); border-radius: 999px; height: 8px; overflow: hidden; display: inline-block; width: 90px; vertical-align: middle; }
+.pct-vul { background: linear-gradient(90deg, var(--amber), var(--amber-donker)); height: 100%; }
+.pct-tekst { font-size: .82rem; color: var(--stil); margin-left: 8px; font-variant-numeric: tabular-nums; }
+.zoekbalk { margin-bottom: 12px; }
+.zoekbalk input { max-width: 280px; }
+
+/* ------------------------------------------------------ wedstrijden -- */
+.wedstrijd-lijst { display: flex; flex-direction: column; }
+.wedstrijd-teams { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 1.05rem; }
+.team-naam { font-weight: 700; color: var(--navy-donker); }
+.team-naam.winnaar::before { content: "🏆 "; }
+.vs { color: var(--stil); font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; }
+.vs-klein { color: var(--stil); font-size: .78rem; }
+.wedstrijd-meta { color: var(--stil); font-size: .88rem; margin-top: 6px; }
+.delta { font-size: .82rem; font-weight: 700; margin-left: 4px; }
+.delta.plus { color: var(--groen); }
+.delta.min { color: var(--rood); }
+.wedstrijd-stats { margin-top: 10px; font-size: .9rem; }
+.wedstrijd-stats summary { cursor: pointer; color: var(--amber-donker); }
+.wedstrijd-stats ul { margin: 8px 0 0; padding-left: 20px; color: var(--stil); }
+
+/* ------------------------------------------------------ statistieken -- */
+.stat-raster { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 720px) { .stat-raster { grid-template-columns: 1fr; } }
+
+/* ------------------------------------------------------ formulieren -- */
+input, select, button { font: inherit; }
+input[type="text"], input[type="password"], input[type="number"],
+input[type="search"], input[type="datetime-local"], select {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--lijn);
+  border-radius: 10px; background: #fff; color: var(--inkt);
+}
+input:focus, select:focus { outline: 2px solid var(--amber); border-color: var(--amber); }
+label { display: block; font-size: .88rem; color: var(--stil); margin: 10px 0; }
+label input, label select { margin-top: 4px; }
+.knop {
+  display: inline-block; border: 1px solid var(--lijn); background: #fff;
+  color: var(--navy-donker); padding: 9px 18px; border-radius: 10px;
+  cursor: pointer; font-weight: 600; text-decoration: none;
+  transition: transform .06s, box-shadow .15s;
+}
+.knop:hover, .knop:focus { text-decoration: none; }
+.knop:hover { box-shadow: var(--schaduw); }
+.knop:active { transform: scale(.98); }
+.knop.primair { background: var(--amber); border-color: var(--amber-donker); color: var(--navy-donker); }
+.knop.primair:hover { background: var(--amber-donker); color: #fff; }
+.knop.gevaar { background: #fff; border-color: #fecaca; color: var(--rood); }
+.knop.gevaar:hover { background: var(--rood); border-color: var(--rood); color: #fff; }
+.knop.klein { padding: 5px 12px; font-size: .84rem; }
+.knop.breed { width: 100%; }
+/* Twee formulieren onder elkaar (bv. "Resultaat opslaan" en "Verwijderen")
+   mogen niet tegen elkaar plakken — behalve in een flexrij, daar staan ze naast
+   elkaar met een eigen gap. */
+form + form { margin-top: 12px; }
+.actie-rij form + form, .rij-form form + form { margin-top: 0; }
+
+/* Een knop die rechtstreeks op een veld of label volgt, krijgt lucht.
+   In flexrijen (.rij-form, .plan-onder, .inline-form) staan ze naast elkaar,
+   daar mag die marge er niet bij. */
+input + .knop, select + .knop, label + .knop, textarea + .knop,
+label + button.knop, input + button.knop { margin-top: 16px; }
+.rij-form input + .knop, .rij-form select + .knop, .rij-form label + .knop,
+.plan-onder label + .knop, .plan-onder input + .knop,
+.inline-form input + .knop, .actie-rij input + .knop { margin-top: 0; }
+
+.rij-form { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.rij-form input { flex: 1 1 200px; }
+.rij-form .knop { flex: 0 0 auto; }
+.ruimte-boven { margin-top: 12px; }
+
+/* plannen */
+.plan-raster { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; }
+@media (max-width: 720px) { .plan-raster { grid-template-columns: 1fr; } }
+.plan-raster fieldset { border: 1px dashed var(--lijn); border-radius: var(--radius); padding: 12px; }
+.plan-raster legend { font-size: .8rem; text-transform: uppercase; letter-spacing: .6px; color: var(--stil); padding: 0 6px; }
+.plan-raster select { margin: 6px 0; }
+.plan-vs { text-align: center; font-weight: 800; color: var(--amber-donker); font-size: 1.1rem; }
+.plan-onder { display: flex; align-items: end; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+.plan-onder label { flex: 0 0 260px; margin: 0; }
+
+/* resultaat invullen */
+.resultaat-form { border-top: 1px solid var(--lijn); margin-top: 14px; padding-top: 12px; }
+.resultaat-rij { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 6px 0; }
+.resultaat-rij label { margin: 0; }
+.veld-label { font-size: .88rem; color: var(--stil); }
+.radio { display: inline-flex; align-items: center; gap: 6px; font-size: .95rem; color: var(--inkt); }
+.radio input { width: auto; }
+.stats-invul { margin: 14px 0; }
+.stats-invul summary { cursor: pointer; color: var(--amber-donker); font-size: .92rem; }
+.stat-input { width: 90px; text-align: right; }
+.resultaat-acties { margin-top: 16px; }
+
+/* pillen & meldingen */
+.pil { background: var(--lijn); color: var(--stil); font-size: .78rem; padding: 3px 10px; border-radius: 999px; }
+.pil-actief { background: #dcfce7; color: var(--groen); }
+.flashes { margin-top: 16px; }
+.flash { padding: 12px 16px; border-radius: 10px; margin-bottom: 8px; font-size: .95rem; }
+.flash-ok { background: #dcfce7; color: #14532d; border: 1px solid #bbf7d0; }
+.flash-fout { background: #fee2e2; color: #7f1d1d; border: 1px solid #fecaca; }
+
+/* anker-navigatie admin */
+.anker-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 16px; }
+.anker-nav a {
+  font-size: .85rem; color: var(--navy-donker); text-decoration: none;
+  background: #fff; border: 1px solid var(--lijn); padding: 6px 14px; border-radius: 999px;
+}
+.anker-nav a:hover { border-color: var(--amber); color: var(--amber-donker); }
+
+/* login */
+.login-wrap { display: flex; justify-content: center; padding: 50px 0; }
+.login-kaart { max-width: 380px; width: 100%; text-align: center; }
+.login-kaart h1 { margin: 0 0 4px; }
+.login-kaart form { text-align: left; margin-top: 16px; }
+/* de knop mag niet tegen het invoerveld erboven plakken */
+.login-kaart form .knop { margin-top: 18px; }
+.login-kaart form > label { margin: 0 0 6px; }
+.login-kaart form > label + input { margin-bottom: 0; }
+
+/* ------------------------------------------- je account opeisen (claim) -- */
+.breed-kaart { max-width: 560px; }
+.zoek-groot { font-size: 1.05rem !important; padding: 12px 16px !important; margin-bottom: 14px; }
+
+/* Stap 1: één grote, aantikbare knop per naam. */
+.naam-keuze { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.naam-knop {
+  display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit;
+  border: 1px solid var(--lijn); border-radius: 12px; padding: 12px 14px; background: #fff;
+  transition: border-color .12s, transform .08s, box-shadow .15s;
+}
+.naam-knop:hover, .naam-knop:focus-visible {
+  border-color: var(--amber); transform: translateY(-1px); box-shadow: var(--schaduw);
+}
+.naam-knop .naam { font-weight: 600; font-size: 1.05rem; }
+.naam-knop::after { content: "›"; margin-left: auto; color: var(--stil); font-size: 1.5rem; }
+.naam-letter {
+  width: 36px; height: 36px; border-radius: 50%; flex: 0 0 auto;
+  background: var(--navy-donker); color: var(--amber);
+  font-weight: 700; text-align: center; line-height: 36px;
+}
+
+/* Stap 2: welk account eis je op? */
+.claim-kop {
+  display: flex; align-items: center; gap: 14px; text-align: left;
+  border: 1px solid var(--lijn); border-radius: 12px; padding: 12px 14px;
+  background: var(--fond); margin: 6px 0 4px;
+}
+.claim-letter {
+  width: 48px; height: 48px; border-radius: 50%; flex: 0 0 auto;
+  background: var(--navy-donker); color: var(--amber);
+  font-weight: 700; font-size: 1.3rem; text-align: center; line-height: 48px;
+}
+.claim-kop p { margin: 0; }
+.claim-naam { margin: 0; font-size: 1.4rem; line-height: 1.2; }
+
+/* diversen */
+.stil { color: var(--stil); }
+.klein-tekst { font-size: .84rem; }
+.voet {
+  margin-top: 50px; padding: 22px 0; text-align: center;
+  color: var(--stil); font-size: .85rem; border-top: 1px solid var(--lijn);
+}
+/* Discrete ingang naar het organisatiepaneel: een klein, rustig linkje onderaan.
+   Duidelijk klikbaar voor wie het zoekt, maar het trekt geen aandacht. */
+.voet-organisatie {
+  display: inline-block; margin-top: 8px; padding: 4px 10px;
+  color: var(--stil); text-decoration: none; font-size: .78rem;
+  border: 1px solid var(--lijn); border-radius: 999px; background: #fff;
+  opacity: .7; transition: opacity .15s, color .15s, border-color .15s;
+}
+.voet-organisatie:hover, .voet-organisatie:focus {
+  opacity: 1; color: var(--amber-donker); border-color: var(--amber);
+}
+@media (max-width: 720px) { .voet-organisatie { margin-top: 10px; } }
+
+/* ------------------------------------------------------------- v2 -- */
+.logo-beeld { width: 46px; height: 46px; display: block; }
+
+.profiel-link { color: inherit; text-decoration: none; border-bottom: 1px dotted rgba(30, 41, 59, .35); }
+.profiel-link:hover { color: var(--amber-donker); border-bottom-color: var(--amber-donker); }
+
+.rang-pil {
+  display: inline-block; color: #fff; font-size: .75rem; font-weight: 700;
+  padding: 3px 10px; border-radius: 999px; letter-spacing: .3px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .25); vertical-align: middle;
+  background: var(--stil);   /* eigen kleur van de rang komt uit data-kleur */
+}
+.rang-pil.groot { font-size: .95rem; padding: 5px 16px; }
+.pil-rood { background: #fee2e2; color: var(--rood); }
+/* Organisator/eigenaar: een eigen kleur, zodat je ze niet verwart met "actief". */
+.pil-rol { background: #ede9fe; color: #6d28d9; font-weight: 600; }
+
+/* Meerdere labels onder elkaar in één tabelcel (status + rol). */
+.pil-stapel { white-space: nowrap; }
+.pil-stapel .pil { display: block; width: fit-content; }
+.pil-stapel .pil + .pil { margin-top: 5px; }
+
+.profiel-kop h1 { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.actie-rij { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.inline-form { display: flex; gap: 6px; align-items: center; }
+.mini-input { width: 150px !important; padding: 6px 10px !important; font-size: .85rem; }
+input[type="color"] { width: 46px; height: 40px; padding: 2px; border: 1px solid var(--lijn); border-radius: 10px; background: #fff; cursor: pointer; }
+
+/* ELO-grafiek */
+.elo-grafiek { position: relative; width: 100%; }
+.elo-grafiek svg { width: 100%; height: auto; display: block; }
+.elo-lijn { fill: none; stroke: var(--amber-donker); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.elo-vlak { fill: rgba(245, 158, 11, .12); stroke: none; }
+.elo-punt { fill: #fff; stroke: var(--amber-donker); stroke-width: 2; }
+.elo-punt.actief { fill: var(--amber-donker); r: 5; }
+.elo-as { stroke: var(--lijn); stroke-width: 1; }
+.elo-aslabel { fill: var(--stil); font-size: 11px; }
+.elo-tooltip {
+  position: absolute; pointer-events: none; background: var(--navy-donker); color: #fff;
+  font-size: .8rem; padding: 8px 12px; border-radius: 8px; white-space: nowrap;
+  transform: translate(-50%, -115%); box-shadow: var(--schaduw); display: none; z-index: 5;
+}
+.elo-tooltip strong { color: var(--amber); }
+
+
+/* -------------------------------------------------- recordboek -- */
+.record-raster {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px; margin: 14px 0;
+}
+.record-kaart { margin: 0; text-align: center; padding: 22px 16px; }
+.record-emoji { font-size: 1.9rem; }
+.record-titel {
+  font-size: .75rem; text-transform: uppercase; letter-spacing: .6px;
+  color: var(--stil); margin-top: 6px;
+}
+.record-waarde { font-size: 1.25rem; font-weight: 800; color: var(--navy-donker); margin: 4px 0; }
+.record-houder { font-size: .92rem; color: var(--amber-donker); font-weight: 600; }
+
+/* --------------------------- mobiel: tabellen scrollen ín de kaart -- */
+@media (max-width: 720px) {
+  .tabel {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tabel th, .tabel td { white-space: nowrap; }
+  /* namen mogen wél afbreken, anders wordt de tabel onnodig breed */
+  .tabel td.naam, .tabel td.wikkel, .tabel th.wikkel { white-space: normal; }
+  .kol-pct { width: auto; }
+}
+
+
+/* ----------------------------------------- uitslagmeldingen -- */
+.meld-status { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.conflict-kaart { border: 1px solid #fecaca; background: #fffafa; }
+.conflict-tekst { color: var(--rood); font-size: .9rem; margin: 10px 0 0; }
+.stats-invul .resultaat-rij label { margin: 6px 0; }
+
+/* ---------------------------------------------- v4: avatars & profielen -- */
+.avatar-mini {
+  width: 26px; height: 26px; border-radius: 50%; object-fit: cover;
+  vertical-align: middle; display: inline-flex; align-items: center;
+  justify-content: center; flex: 0 0 auto;
+}
+.avatar-fallback {
+  background: var(--navy-donker); color: var(--amber); font-weight: 700;
+  font-size: .8rem; text-align: center; line-height: 26px;
+}
+.met-avatar { display: inline-flex; align-items: center; gap: 8px; }
+.avatar-groot {
+  width: 84px; height: 84px; border-radius: 50%; object-fit: cover;
+  border: 3px solid var(--amber); flex: 0 0 auto; display: inline-flex;
+  align-items: center; justify-content: center;
+}
+span.avatar-groot { font-size: 2rem; line-height: 78px; }
+.profiel-rij { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.team-beschrijving { color: var(--stil); font-style: italic; margin: 4px 0 0; }
+
+/* ------------------------------------------------------- rangverdeling -- */
+.verdeling { display: flex; flex-direction: column; gap: 10px; }
+.verdeling-rij { display: grid; grid-template-columns: 130px 1fr 110px; gap: 12px; align-items: center; }
+.verdeling-balk { background: var(--lijn); border-radius: 999px; height: 14px; overflow: hidden; }
+.verdeling-vul { height: 100%; border-radius: 999px; min-width: 2px; }
+.verdeling-aantal { font-size: .85rem; color: var(--stil); text-align: right; }
+@media (max-width: 720px) {
+  .verdeling-rij { grid-template-columns: 96px 1fr 80px; gap: 8px; }
+}
+
+/* ----------------------------------------------------------- seizoenen -- */
+.seizoen-kop { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.seizoen-kop h3 { margin: 0; }
+.seizoen-highlight { margin-top: 8px; font-size: .95rem; }
+.ere-lijst { margin: 0; padding-left: 22px; }
+.ere-lijst li { margin: 6px 0; }
+.inline-datum { display: flex; align-items: center; gap: 8px; margin: 0; flex: 0 0 auto; }
+.inline-datum input { width: auto; }
+input[type="date"], input[type="file"] {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--lijn);
+  border-radius: 10px; background: #fff; color: var(--inkt);
+}
+input[type="file"] { padding: 7px 10px; }
+
+/* ================================================================
+   v5 — liga & toernooi: sectiebalk, toernooipagina's, bracket, loting
+   ================================================================ */
+
+/* ------------------------------------------------------ sectiebalk -- */
+.sectiebalk { background: rgba(255, 255, 255, .06); border-top: 1px solid rgba(255, 255, 255, .08); }
+.sectie-inner {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding-top: 8px; padding-bottom: 8px;
+}
+.sectie-keuze { display: flex; gap: 6px; }
+.sectie-knop {
+  display: inline-flex; align-items: center; gap: 7px; text-decoration: none;
+  color: #e2e8f0; font-weight: 700; font-size: .95rem; letter-spacing: .2px;
+  padding: 7px 18px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .18);
+  transition: background .15s, color .15s;
+}
+.sectie-knop:hover { background: rgba(255, 255, 255, .12); }
+.sectie-knop.actief { background: var(--amber); border-color: var(--amber); color: var(--navy-donker); }
+.sectie-icoon { font-size: 1.05rem; }
+.subnav { display: flex; gap: 2px; flex-wrap: wrap; }
+.subnav a {
+  color: #cbd5e1; text-decoration: none; font-size: .88rem;
+  padding: 6px 12px; border-radius: 8px;
+}
+.subnav a:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+/* Geselecteerd = rustig opgelicht vlak, geen streep of accentlijn. */
+.subnav a.actief { background: rgba(255, 255, 255, .16); color: #fff; font-weight: 600; }
+@media (max-width: 720px) {
+  /* Op een gsm valt de sectiebalk in twee rijen uiteen; zonder wat verticale
+     lucht plakken de knoppen tegen de rand van de balk. */
+  .sectie-inner { gap: 10px; padding-top: 12px; padding-bottom: 12px; }
+  .subnav a { padding: 7px 11px; font-size: .82rem; }
+}
+
+/* -------------------------------------------------- toernooioverzicht -- */
+.toernooi-raster {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px; margin: 14px 0;
+}
+.toernooi-kaart { display: block; text-decoration: none; color: inherit; margin: 0; transition: transform .08s, box-shadow .15s; }
+.toernooi-kaart:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(15, 23, 42, .12); }
+.toernooi-kop { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.toernooi-kop h3 { margin: 0; }
+.toernooi-cijfers { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: .85rem; color: var(--stil); }
+.toernooi-cijfers strong { color: var(--navy-donker); font-size: 1rem; }
+.toernooi-winnaar { margin: 10px 0 0; font-weight: 700; color: var(--amber-donker); }
+.uitleg-kaart { margin-top: 26px; }
+
+.pil-fase { font-weight: 700; }
+.pil-opzet { background: #e2e8f0; color: var(--navy); }
+.pil-bracket { background: #dbeafe; color: #1d4ed8; }
+.pil-knockout { background: #fef3c7; color: var(--amber-donker); }
+.pil-afgelopen { background: #dcfce7; color: #14532d; }
+.pil-toernooi { background: #fef3c7; color: var(--amber-donker); }
+
+/* ------------------------------------------------------------ potten -- */
+.pot-pil {
+  display: inline-block; font-size: .72rem; font-weight: 700; padding: 2px 9px;
+  border-radius: 999px; background: var(--lijn); color: var(--navy);
+}
+.pot-1 { background: #fde68a; color: #92400e; }
+.pot-2 { background: #bfdbfe; color: #1e40af; }
+.pot-3 { background: #c7d2fe; color: #3730a3; }
+.pot-4 { background: #d9f99d; color: #3f6212; }
+.pot-5 { background: #fbcfe8; color: #9d174d; }
+.pot-6 { background: #99f6e4; color: #115e59; }
+
+.potten-raster {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px; margin: 14px 0;
+}
+.pot-kaart { margin: 0; }
+.pot-kaart h3 { margin-bottom: 8px; }
+.pot-rand-1 { border-top: 4px solid #fbbf24; }
+.pot-rand-2 { border-top: 4px solid #60a5fa; }
+.pot-rand-3 { border-top: 4px solid #818cf8; }
+.pot-rand-4 { border-top: 4px solid #a3e635; }
+.pot-rand-5 { border-top: 4px solid #f472b6; }
+.pot-rand-6 { border-top: 4px solid #2dd4bf; }
+.pot-lijst { margin: 0; padding-left: 20px; }
+.pot-lijst li { margin: 8px 0; }
+.elo-badge.klein { font-size: .72rem; padding: 1px 8px; }
+
+/* -------------------------------------------------------------- stand -- */
+.rij-door { background: #f7fdf9; }
+.rij-door td:first-child { box-shadow: inset 3px 0 0 var(--groen); }
+.rij-onbeslist { background: #fffaf5; }
+.vorm-bol {
+  display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center;
+  border-radius: 50%; font-size: .7rem; font-weight: 700; color: #fff; margin-right: 3px;
+}
+.vorm-W { background: var(--groen); }
+.vorm-V { background: var(--rood); }
+.shootout-melding {
+  background: #fff7ed; border: 1px solid #fed7aa; color: #7c2d12;
+  border-radius: 10px; padding: 10px 14px; font-size: .92rem; margin: 4px 0 12px;
+}
+
+/* ------------------------------------------------------------ bracket -- */
+.bracket { display: flex; gap: 18px; overflow-x: auto; padding: 6px 2px 14px; }
+.bracket-kolom { display: flex; flex-direction: column; justify-content: space-around; gap: 14px; min-width: 190px; }
+.bracket-titel {
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .6px;
+  color: var(--stil); text-align: center; margin-bottom: 2px;
+}
+.bracket-game {
+  border: 1px solid var(--lijn); border-radius: 12px; overflow: hidden; background: #fff;
+  box-shadow: var(--schaduw);
+}
+.bracket-game.gespeeld { border-color: #fcd34d; }
+.bracket-kant { padding: 8px 12px; font-size: .9rem; border-bottom: 1px solid var(--lijn); }
+.bracket-kant:last-of-type { border-bottom: none; }
+.bracket-kant.winnaar { background: #fffbeb; font-weight: 700; }
+.bracket-kant.winnaar::before { content: "🏆 "; }
+.bracket-meta { font-size: .72rem; color: var(--stil); padding: 5px 12px; background: #fafafa; }
+
+.winnaar-kaart { display: flex; align-items: center; gap: 20px; border: 2px solid var(--amber); }
+.winnaar-beker { font-size: 3rem; }
+.winnaar-naam { font-size: 1.5rem; font-weight: 800; color: var(--navy-donker); margin: 2px 0 0; }
+
+/* ------------------------------------------------------------- loting -- */
+.loting-held h1 { font-size: 2.2rem; }
+.affiche-raster {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px; margin: 12px 0 26px;
+}
+.affiche-kaart {
+  margin: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 4px; text-align: center;
+}
+.affiche-kant { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.affiche-naam { font-weight: 800; color: var(--navy-donker); font-size: 1.05rem; }
+.affiche-vs { color: var(--amber-donker); font-weight: 800; font-size: .8rem; letter-spacing: 1px; margin: 4px 0; }
+.affiche-tijd { font-size: .72rem; color: var(--stil); margin-top: 6px; }
+
+/* ------------------------------------------------------ organisatiepaneel -- */
+.admin-nav {
+  display: flex; gap: 6px; flex-wrap: wrap; margin: 18px 0 6px;
+  border-bottom: 1px solid var(--lijn); padding-bottom: 10px;
+}
+.admin-nav a {
+  font-size: .88rem; color: var(--navy-donker); text-decoration: none;
+  background: #fff; border: 1px solid var(--lijn); padding: 7px 14px;
+  border-radius: 999px; white-space: nowrap;
+}
+.admin-nav a:hover { border-color: var(--amber); color: var(--amber-donker); }
+.admin-nav a.actief {
+  background: var(--navy-donker); border-color: var(--navy-donker);
+  color: #fff; font-weight: 600;
+}
+
+.admin-tegels {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 14px; margin: 18px 0;
+}
+.tegel {
+  margin: 0; display: block; text-decoration: none; color: inherit;
+  transition: transform .08s, box-shadow .15s;
+}
+.tegel:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(15, 23, 42, .12); }
+.tegel h3 { margin: 6px 0 4px; }
+.tegel-icoon { font-size: 1.6rem; }
+.tegel-cijfer { margin: 8px 0 6px; font-weight: 700; color: var(--navy-donker); font-size: .95rem; }
+.aandacht-kaart { border: 1px solid #fed7aa; background: #fff7ed; }
+.aandacht-kaart h3 { margin-top: 0; }
+.aandacht-kaart p:last-child { margin-bottom: 0; }
+
+/* Onderdelen die enkel de organisatie ziet omdat de league uit staat. */
+.pil-verborgen { background: #e2e8f0; color: var(--navy); font-weight: 600; }
+.tegel-uit { border-style: dashed; }
+.admin-nav a.league-uit { opacity: .68; }
+
+/* ------------------------------------------- beamerscherm met QR-code -- */
+.scherm { text-align: center; padding: 10px 0 30px; }
+.scherm-titel { font-size: clamp(2rem, 5.5vw, 4.2rem); margin: 0 0 6px; line-height: 1.05; }
+.scherm-onder { font-size: clamp(1rem, 1.7vw, 1.5rem); color: var(--stil); margin: 0 0 26px; }
+.scherm-raster {
+  display: flex; gap: 36px; align-items: center; justify-content: center; flex-wrap: wrap;
+}
+.qr-kader {
+  background: #fff; border-radius: 20px; padding: 14px; box-shadow: var(--schaduw);
+  width: min(46vw, 44vh, 460px); flex: 0 0 auto;
+}
+.qr-kader svg { width: 100%; height: auto; display: block; }
+.scherm-info { text-align: left; max-width: 44ch; }
+.scherm-label {
+  font-size: .95rem; color: var(--stil); text-transform: uppercase;
+  letter-spacing: 1.4px; margin: 0 0 4px;
+}
+.scherm-adres {
+  font-size: clamp(1.1rem, 2.4vw, 2rem); font-weight: 700; word-break: break-all;
+  margin: 0 0 26px; color: var(--amber-donker);
+}
+.scherm-teller { display: flex; gap: 28px; margin-bottom: 22px; }
+.scherm-teller div { display: flex; flex-direction: column; }
+.scherm-teller strong { font-size: clamp(2rem, 4vw, 3.4rem); line-height: 1; }
+.scherm-teller span { font-size: .95rem; color: var(--stil); }
+.scherm-namen { font-size: clamp(1rem, 1.5vw, 1.3rem); line-height: 1.7; margin: 0; }
+.scherm-klaar { font-size: clamp(1.3rem, 2.6vw, 2.2rem); font-weight: 700; color: var(--groen); }
+
+@media (max-width: 720px) {
+  .scherm-raster { gap: 22px; }
+  .qr-kader { width: min(76vw, 340px); }
+  .scherm-info { text-align: center; }
+  .scherm-teller { justify-content: center; }
+}
+
+/* Aan-uitvinkje met tekst ernaast (bv. het leaguegedeelte tonen). */
+.schakel { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; cursor: pointer; }
+.schakel input { width: 20px; height: 20px; margin: 0; flex: 0 0 auto; accent-color: var(--amber-donker); }
+.schakel span { font-weight: 600; }
+
+/* ------------------------------------- palmares op het spelersprofiel -- */
+.plaats-pil {
+  display: inline-block; font-weight: 700; font-size: .85rem;
+  padding: 2px 9px; border-radius: 999px; background: var(--lijn);
+  color: var(--navy-donker); font-variant-numeric: tabular-nums;
+}
+.plaats-pil sup { font-size: .7em; }
+.plaats-1 { background: #fde68a; color: #92400e; }
+.plaats-2 { background: #e2e8f0; color: #334155; }
+.plaats-3 { background: #fed7aa; color: #9a3412; }
+
+.uitslag-pil {
+  display: inline-block; font-size: .82rem; font-weight: 600;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--lijn); color: var(--navy-donker);
+}
+.uitslag-goud { background: #fde68a; color: #92400e; }
+.uitslag-zilver { background: #e2e8f0; color: #334155; }
+.uitslag-brons { background: #fed7aa; color: #9a3412; }
+.uitslag-loopt { background: #dbeafe; color: #1d4ed8; }
+
+/* spelersnummer & zoeken naar een teamgenoot */
+.speler-id {
+  display: inline-block; background: var(--lijn); color: var(--navy-donker);
+  font-weight: 700; font-size: .78rem; padding: 2px 9px; border-radius: 999px;
+  margin-right: 6px; font-variant-numeric: tabular-nums;
+}
+.partner-keuze { margin-bottom: 4px; }
+select[size] { padding: 6px; }
+select[size] option { padding: 5px 8px; border-radius: 6px; }
+
+/* context van een geplande wedstrijd */
+.wedstrijd-context {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 8px; font-size: .9rem; color: var(--inkt);
+}
+
+/* -------------------------------------------------------- toernooiadmin -- */
+.keuze-raster {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px;
+}
+.keuze-vak {
+  display: flex; align-items: flex-start; gap: 9px; margin: 0;
+  border: 1px solid var(--lijn); border-radius: 10px; padding: 9px 12px; cursor: pointer;
+}
+.keuze-vak:hover { border-color: var(--amber); }
+.keuze-vak input { width: auto; margin-top: 3px; }
+.keuze-vak span { display: block; color: var(--inkt); }
+.keuze-vak .klein-tekst { display: block; }
+/* Definitief verwijderen: bewust weggestopt achter een klikje, met een
+   bevestigingswoord. Zo gebeurt het nooit per ongeluk. */
+.wis-blok { margin-top: 6px; }
+.wis-blok > summary {
+  cursor: pointer; color: var(--rood); font-size: .82rem; white-space: nowrap;
+}
+.wis-blok[open] {
+  border: 1px solid #fecaca; background: #fffafa;
+  border-radius: 10px; padding: 10px 12px; margin-top: 8px;
+}
+.wis-blok[open] > summary { margin-bottom: 6px; font-weight: 600; }
+.wis-blok p { margin: 0 0 8px; white-space: normal; }
+.wis-blok .rij-form { margin-bottom: 0; }
+.wis-blok input[type="text"] { max-width: 170px; }
+.wis-blok code {
+  background: var(--lijn); padding: 1px 6px; border-radius: 6px; font-weight: 700;
+}
+/* Zelfde uitklapblok, maar zonder alarmkleur: voor gewone correcties. */
+.wis-blok.zacht > summary { color: var(--stil); }
+.wis-blok.zacht[open] { border-color: var(--lijn); background: var(--fond); }
+.wis-blok.zacht input[type="text"] { max-width: 220px; }
+
+/* Korte uitleg onder een invulveld in een formulier. */
+.velduitleg { margin: -6px 0 14px; }
+
+.locatie-pil {
+  display: inline-flex; align-items: center; gap: 6px; background: #dcfce7; color: #14532d;
+  border-radius: 999px; padding: 3px 6px 3px 12px; font-size: .82rem;
+}
+.knop-x {
+  border: none; background: rgba(0, 0, 0, .08); color: inherit; cursor: pointer;
+  width: 20px; height: 20px; border-radius: 50%; line-height: 1; padding: 0;
+}
+.knop-x:hover { background: var(--rood); color: #fff; }
+button[disabled] { opacity: .5; cursor: not-allowed; }
+
+/* ================================================================
+   Telefoon: de site wordt vooral aan de tafel gebruikt, op een gsm
+   ================================================================ */
+
+/* "Wie won?" — de belangrijkste knoppen van de avond, dus groot en duidelijk */
+.keuze-groep { display: flex; gap: 10px; flex-wrap: wrap; width: 100%; margin: 6px 0 14px; }
+.keuze-groep .radio {
+  flex: 1 1 160px; justify-content: center; gap: 10px;
+  border: 2px solid var(--lijn); border-radius: 12px;
+  padding: 14px 12px; font-weight: 600; text-align: center;
+  background: #fff; cursor: pointer; transition: border-color .12s, background .12s;
+}
+.keuze-groep .radio:hover { border-color: var(--amber); }
+.keuze-groep .radio input { width: 20px; height: 20px; accent-color: var(--amber-donker); }
+.keuze-groep .radio:has(input:checked) {
+  border-color: var(--amber-donker); background: #fffbeb;
+}
+
+@media (max-width: 720px) {
+  /* Op een gsm winnen we ruimte in de BREEDTE (smallere marges, minder kolommen).
+     De hoogte laten we grotendeels met rust: anders oogt alles samengeperst. */
+  .wrap { padding: 0 14px; }
+  .held { padding: 28px 0 16px; }
+  .held h1 { font-size: 1.5rem; margin-bottom: 8px; }
+  .held p { font-size: .95rem; }
+  .sectiekop { font-size: 1.12rem; margin: 28px 0 4px; }
+  .kaart { padding: 18px 16px; }
+
+  /* Kopbalk compact houden, maar niet luchtledig */
+  .topbar-inner { padding-top: 12px; padding-bottom: 12px; }
+  .logo small { display: none; }
+  .logo-beeld { width: 36px; height: 36px; }
+  .logo strong { font-size: 1.05rem; }
+  .nav a { padding: 6px 11px; font-size: .85rem; }
+  .sectie-knop { padding: 6px 14px; font-size: .9rem; }
+
+  /* Navigatiebalken schuiven horizontaal in plaats van te wikkelen */
+  .subnav, .tabs, .anker-nav, .admin-nav {
+    flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; padding-bottom: 2px;
+  }
+  .subnav::-webkit-scrollbar, .tabs::-webkit-scrollbar,
+  .anker-nav::-webkit-scrollbar, .admin-nav::-webkit-scrollbar { display: none; }
+  .subnav a, .tabs .tab, .anker-nav a, .admin-nav a { flex: 0 0 auto; }
+  .tabs .tab { padding: 9px 16px; }
+
+  /* Invoervelden op 16px: kleinere tekst laat iPhones inzoomen bij het tikken */
+  input[type="text"], input[type="password"], input[type="number"],
+  input[type="search"], input[type="date"], input[type="datetime-local"],
+  select, textarea { font-size: 16px; }
+  .mini-input { width: 100% !important; font-size: 16px !important; padding: 9px 12px !important; }
+  .inline-form { flex-wrap: wrap; width: 100%; }
+  .inline-form .knop { width: 100%; }
+
+  /* Grotere tikdoelen */
+  .knop { padding: 11px 18px; }
+  .knop.klein { padding: 8px 14px; font-size: .88rem; }
+  .resultaat-acties .knop, .resultaat-form .knop.primair { width: 100%; }
+  .keuze-groep .radio { flex: 1 1 100%; padding: 16px 12px; font-size: 1rem; }
+
+  /* Minder belangrijke kolommen verdwijnen; de rest past zonder schuiven.
+     Enkel de zijkanten worden smaller — de rijhoogte blijft zoals op pc. */
+  .verbergen-mobiel { display: none; }
+  .tabel td, .tabel th { padding: 10px 6px; }
+  .kol-rang { width: 34px; }
+  .kol-elo { width: auto; }
+  .avatar-mini { width: 22px; height: 22px; line-height: 22px; }
+
+  /* Diversen */
+  .zoekbalk input { max-width: none; }
+  .held-cijfers { gap: 18px 20px; }   /* smaller náást elkaar, niet eronder */
+  .cijfer strong { font-size: 1.3rem; }
+  .profiel-rij { gap: 14px; }
+  .avatar-groot { width: 64px; height: 64px; }
+  span.avatar-groot { font-size: 1.5rem; line-height: 58px; }
+  .plan-onder label { flex: 1 1 100%; }
+  .rij-form input { flex: 1 1 100%; }
+  .bracket { gap: 12px; }
+  .bracket-kolom { min-width: 165px; }
+  .record-raster { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .toernooi-raster, .admin-tegels, .potten-raster, .affiche-raster {
+    grid-template-columns: 1fr;
+  }
+  .voet { margin-top: 40px; }
+}
+
+/* Toestellen zonder muis: nooit te kleine tikdoelen */
+@media (hover: none) {
+  .knop, .tab, .nav a, .subnav a, .sectie-knop { min-height: 40px; }
+  .knop, .tab { display: inline-flex; align-items: center; justify-content: center; }
+}

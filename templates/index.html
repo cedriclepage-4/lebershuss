@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block titel %}Klassement{% endblock %}
+{% block inhoud %}
+
+<section class="held">
+  <h1>Het klassement</h1>
+  <p>Hieronder vind je de actuele ELO-ratings van alle 
+     spelers en van elk duo dat ooit samen aan tafel stond.
+     Klik op een naam voor het volledige profiel.</p>
+  <div class="held-cijfers">
+    <div class="cijfer"><strong>{{ aantal_spelers }}</strong><span>spelers</span></div>
+    <div class="cijfer"><strong>{{ aantal_teams }}</strong><span>teams</span></div>
+    <div class="cijfer"><strong>{{ aantal_gespeeld }}</strong><span>gespeelde wedstrijden</span></div>
+  </div>
+</section>
+
+<div class="tabs" data-tabs>
+  <button class="tab actief" data-tab="spelers">Spelers</button>
+  <button class="tab" data-tab="teams">Teams</button>
+</div>
+
+<section class="paneel" data-paneel="spelers">
+  {% if spelers %}
+  <div class="kaart">
+    <div class="zoekbalk"><input type="search" placeholder="Zoek een speler…" data-zoek="#tabel-spelers"></div>
+    <table class="tabel" id="tabel-spelers">
+      <thead>
+        <tr><th class="kol-rang">#</th><th>Speler</th><th class="verbergen-mobiel">Rang</th><th class="kol-elo">ELO</th>
+            <th class="kol-num verbergen-mobiel">Gespeeld</th><th class="kol-num">W</th><th class="kol-num">V</th>
+            <th class="kol-pct verbergen-mobiel">Winst%</th></tr>
+      </thead>
+      <tbody>
+        {% for s in spelers %}
+        <tr>
+          <td class="kol-rang">{% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}</td>
+          <td class="naam"><a class="profiel-link met-avatar" href="{{ url_for('speler_profiel', speler_id=s.id) }}">
+            {%- if s.avatar %}<img class="avatar-mini" src="{{ url_for('media', bestand=s.avatar) }}" alt="">{% else %}<span class="avatar-mini avatar-fallback">{{ s.naam[0]|upper }}</span>{% endif %} {{ s.naam }}</a></td>
+          <td class="verbergen-mobiel">{% if s.rang %}<span class="rang-pil" data-kleur="{{ s.rang['color'] }}">{{ s.rang['name'] }}</span>{% else %}<span class="stil">—</span>{% endif %}</td>
+          <td class="kol-elo"><span class="elo-badge">{{ s.elo|elo }}</span></td>
+          <td class="kol-num verbergen-mobiel">{{ s.gespeeld }}</td>
+          <td class="kol-num">{{ s.winst }}</td>
+          <td class="kol-num">{{ s.verlies }}</td>
+          <td class="kol-pct verbergen-mobiel">
+            {% if s.pct is not none %}
+              <div class="pct-balk"><div class="pct-vul" data-pct="{{ s.pct|round }}"></div></div>
+              <span class="pct-tekst">{{ s.pct|round|int }}%</span>
+            {% else %}<span class="stil">nog geen wedstrijden</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="kaart leeg">Nog geen spelers. Maak zelf een account aan via <a href="{{ url_for('registreren') }}">Account maken</a>!</div>
+  {% endif %}
+</section>
+
+<section class="paneel verborgen" data-paneel="teams">
+  {% if teams %}
+  <div class="kaart">
+    <div class="zoekbalk"><input type="search" placeholder="Zoek een team…" data-zoek="#tabel-teams"></div>
+    <table class="tabel" id="tabel-teams">
+      <thead>
+        <tr><th class="kol-rang">#</th><th>Team</th><th class="kol-elo">ELO</th>
+            <th class="kol-num verbergen-mobiel">Gespeeld</th><th class="kol-num">W</th><th class="kol-num">V</th>
+            <th class="kol-pct verbergen-mobiel">Winst%</th></tr>
+      </thead>
+      <tbody>
+        {% for t in teams %}
+        <tr>
+          <td class="kol-rang">{% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}</td>
+          <td class="naam"><a class="profiel-link met-avatar" href="{{ url_for('team_profiel', team_id=t.id) }}">
+            {%- if t.avatar %}<img class="avatar-mini" src="{{ url_for('media', bestand=t.avatar) }}" alt="">{% else %}<span class="avatar-mini avatar-fallback">{{ t.naam[0]|upper }}</span>{% endif %} {{ t.naam }}</a></td>
+          <td class="kol-elo"><span class="elo-badge">{{ t.elo|elo }}</span></td>
+          <td class="kol-num verbergen-mobiel">{{ t.gespeeld }}</td>
+          <td class="kol-num">{{ t.winst }}</td>
+          <td class="kol-num">{{ t.verlies }}</td>
+          <td class="kol-pct verbergen-mobiel">
+            <div class="pct-balk"><div class="pct-vul" data-pct="{{ t.pct|round }}"></div></div>
+            <span class="pct-tekst">{{ t.pct|round|int }}%</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="kaart leeg">Nog geen teams in het klassement. Een duo verschijnt hier zodra het zijn eerste wedstrijd gespeeld heeft.</div>
+  {% endif %}
+</section>
+
+{% endblock %}

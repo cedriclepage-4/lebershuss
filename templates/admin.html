@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block titel %}Organisatie{% endblock %}
+{% block inhoud %}
+
+<section class="held">
+  <h1>Organisatiepaneel</h1>
+  <p>Alles voor de organisatie, per onderwerp gebundeld. Na elk resultaat worden
+     de ELO-ratings automatisch bijgewerkt.</p>
+</section>
+
+{% include "_admin_nav.html" %}
+
+{% if not league_zichtbaar %}
+<div class="kaart aandacht-kaart">
+  <h3>🥇 Enkel toernooien</h3>
+  <p class="stil klein-tekst">Het leaguegedeelte staat uit: spelers zien alleen het
+     toernooi, geen klassement, wedstrijden, statistieken of seizoenen. Jij ziet ze
+     nog wel — die pagina's zijn hieronder gemarkeerd. Aanzetten doe je met één
+     vinkje bij <a class="profiel-link" href="{{ url_for('admin_instellingen') }}#league">Instellingen</a>.</p>
+</div>
+{% endif %}
+
+{% if cijfers.conflicten or cijfers.uitnodigingen %}
+<div class="kaart aandacht-kaart">
+  <h3>Vraagt je aandacht</h3>
+  <ul class="ere-lijst">
+    {% if cijfers.conflicten %}
+    <li>⚠️ <strong>{{ cijfers.conflicten }}</strong> wedstrijd(en) met tegenstrijdige
+        meldingen — <a class="profiel-link" href="{{ url_for('admin_wedstrijden') }}#openstaand">beslis zelf wie won</a>.</li>
+    {% endif %}
+    {% if cijfers.uitnodigingen %}
+    <li>✉️ <strong>{{ cijfers.uitnodigingen }}</strong> teamuitnodiging(en) wachten nog
+        op een antwoord van de spelers zelf.</li>
+    {% endif %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="admin-tegels">
+  <a class="kaart tegel {{ 'tegel-uit' if not league_zichtbaar }}" href="{{ url_for('admin_seizoenen') }}">
+    <span class="tegel-icoon">🗓️</span>
+    <h3>Seizoenen {% if not league_zichtbaar %}<span class="pil pil-verborgen">verborgen</span>{% endif %}</h3>
+    <p class="stil klein-tekst">Seizoenen en speeldagen beheren. Elk seizoen heeft
+       zijn eigen ELO-klassement.</p>
+    <p class="tegel-cijfer">{{ cijfers.seizoenen }} seizoen(en)</p>
+    {% if huidig_seizoen %}<span class="pil pil-actief">nu bezig: {{ huidig_seizoen['name'] }}</span>{% endif %}
+  </a>
+
+  <a class="kaart tegel {{ 'tegel-uit' if not league_zichtbaar }}" href="{{ url_for('admin_wedstrijden') }}">
+    <span class="tegel-icoon">🥅</span>
+    <h3>Wedstrijden {% if not league_zichtbaar %}<span class="pil pil-verborgen">verborgen</span>{% endif %}</h3>
+    <p class="stil klein-tekst">Leaguewedstrijden plannen, resultaten invullen en
+       fouten rechtzetten.</p>
+    <p class="tegel-cijfer">{{ cijfers.open_liga }} openstaand · {{ cijfers.gespeeld }} gespeeld</p>
+    {% if cijfers.conflicten %}<span class="pil pil-rood">{{ cijfers.conflicten }} conflict(en)</span>{% endif %}
+  </a>
+
+  <a class="kaart tegel" href="{{ url_for('admin_toernooien') }}">
+    <span class="tegel-icoon">🥇</span>
+    <h3>Toernooien</h3>
+    <p class="stil klein-tekst">Toernooi aanmaken, teams en tafels toewijzen, loting
+       genereren.</p>
+    <p class="tegel-cijfer">{{ cijfers.toernooien }} toernooi(en)</p>
+    {% if cijfers.open_toernooi %}<span class="pil pil-actief">{{ cijfers.open_toernooi }} wedstrijd(en) te spelen</span>{% endif %}
+  </a>
+
+  <a class="kaart tegel" href="{{ url_for('admin_spelers') }}">
+    <span class="tegel-icoon">👥</span>
+    <h3>Spelers &amp; teams</h3>
+    <p class="stil klein-tekst">Wachtwoorden opnieuw instellen, spelers activeren of
+       deactiveren, teams nakijken.</p>
+    <p class="tegel-cijfer">{{ cijfers.spelers }} spelers · {{ cijfers.teams }} teams</p>
+  </a>
+
+  <a class="kaart tegel" href="{{ url_for('admin_klassement') }}">
+    <span class="tegel-icoon">📊</span>
+    <h3>Rangen &amp; statistieken</h3>
+    <p class="stil klein-tekst">Eigen rangen op ELO en zelfgemaakte statistieken
+       zoals “saves”.</p>
+  </a>
+
+  <a class="kaart tegel" href="{{ url_for('admin_instellingen') }}">
+    <span class="tegel-icoon">⚙️</span>
+    <h3>Instellingen</h3>
+    <p class="stil klein-tekst">K-factoren, adminwachtwoord en het herberekenen van
+       alle ratings.</p>
+  </a>
+</div>
+
+{% if lopend %}
+<h2 class="sectiekop">Lopende toernooien</h2>
+<div class="kaart">
+  <table class="tabel compact">
+    <thead><tr><th>Toernooi</th><th>Datum</th><th>Fase</th><th></th></tr></thead>
+    <tbody>
+      {% for t in lopend %}
+      <tr>
+        <td class="naam"><a class="profiel-link" href="{{ url_for('toernooi_detail', toernooi_id=t['id']) }}">{{ t['name'] }}</a></td>
+        <td>{{ t['date']|dag }}</td>
+        <td><span class="pil pil-fase pil-{{ t['status'] }}">{{ t['status'] }}</span></td>
+        <td class="kol-num"><a class="knop klein" href="{{ url_for('toernooi_beheer', toernooi_id=t['id']) }}">Beheren</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endblock %}

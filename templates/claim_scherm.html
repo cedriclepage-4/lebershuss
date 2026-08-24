@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block titel %}Scan om je account op te eisen{% endblock %}
+{% block inhoud %}
+
+{% if not open %}
+<div class="kaart aandacht-kaart">
+  <p class="klein-tekst">⚠️ Accounts opeisen staat <strong>dicht</strong>: wie deze code
+     scant, kan nog niets doen. Zet het open bij
+     <a class="profiel-link" href="{{ url_for('admin_spelers') }}#claimen">Accounts opeisen</a>.</p>
+</div>
+{% endif %}
+
+<section class="scherm">
+  <h1 class="scherm-titel">Scan en kies je naam</h1>
+  <p class="scherm-onder">Je account staat al klaar — je hoeft enkel een wachtwoord te kiezen.</p>
+
+  <div class="scherm-raster">
+    <div class="qr-kader">
+      {% if qr %}{{ qr }}
+      {% else %}
+      <p class="klein-tekst conflict-tekst">Geen QR-code: het pakket <code>segno</code>
+         ontbreekt. Installeer het met <code>pip install segno</code> — het adres
+         hiernaast werkt ondertussen gewoon.</p>
+      {% endif %}
+    </div>
+
+    <div class="scherm-info">
+      <p class="scherm-label">of surf naar</p>
+      <p class="scherm-adres">{{ adres }}</p>
+      <div class="scherm-teller">
+        <div><strong>{{ vrij|length }}</strong><span>nog te doen</span></div>
+        <div><strong>{{ geclaimd }}</strong><span>al klaar</span></div>
+      </div>
+      {% if vrij %}
+      <p class="scherm-label">wacht nog op een wachtwoord</p>
+      <p class="scherm-namen">{{ vrij|map(attribute='naam')|join(' · ') }}</p>
+      {% else %}
+      <p class="scherm-klaar">🎉 Iedereen is binnen!</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  /* Ververst zichzelf, zodat op de beamer live meeloopt wie er al binnen is. */
+  setTimeout(function () { window.location.reload(); }, 10000);
+</script>
+{% endblock %}

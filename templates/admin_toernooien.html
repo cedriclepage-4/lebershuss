@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block titel %}Toernooien beheren{% endblock %}
+{% block inhoud %}
+
+<section class="held">
+  <h1>Toernooien</h1>
+  <p>Maak een toernooi aan, wijs teams en tafels toe en laat de loting genereren.
+     Toernooiwedstrijden tellen enkel mee voor de <strong>permanente</strong> ELO —
+     niet voor een seizoensklassement.</p>
+</section>
+
+{% include "_admin_nav.html" %}
+
+{% if toernooien_lijst %}
+<div class="kaart">
+  <table class="tabel">
+    <thead><tr><th>Toernooi</th><th>Datum</th><th>Status</th><th class="kol-num">Teams</th><th class="kol-num">Open</th><th></th></tr></thead>
+    <tbody>
+      {% for tn in toernooien_lijst %}
+      <tr>
+        <td class="naam"><a class="profiel-link" href="{{ url_for('toernooi_detail', toernooi_id=tn['id']) }}">{{ tn['name'] }}</a></td>
+        <td>{{ tn['date']|dag }}</td>
+        <td><span class="pil pil-fase pil-{{ tn['status'] }}">{{ tn['status'] }}</span></td>
+        <td class="kol-num">{{ tn['aantal_teams'] }}</td>
+        <td class="kol-num">{{ tn['open_games'] }}</td>
+        <td class="kol-num"><a class="knop klein" href="{{ url_for('toernooi_beheer', toernooi_id=tn['id']) }}">Beheren</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="kaart leeg">Nog geen toernooien aangemaakt.</div>
+{% endif %}
+
+<h2 class="sectiekop">Nieuw toernooi</h2>
+<div class="kaart">
+  <p class="stil klein-tekst">Eerst aanmaken, daarna teams en tafels toevoegen en het
+     toernooi laten genereren. Een oneven aantal teams kan: dan rust er elke ronde één
+     team en moet het aantal wedstrijden per team even zijn.</p>
+  <form method="post" action="{{ url_for('toernooi_nieuw') }}">
+    <div class="rij-form">
+      <input type="text" name="naam" placeholder="Naam (bv. Zomertoernooi 2026)" required>
+      <input type="text" name="beschrijving" placeholder="Korte beschrijving (optioneel)">
+    </div>
+    <div class="plan-onder">
+      <label>Datum <input type="date" name="datum" value="{{ vandaag }}" required></label>
+      <label>Startuur <input type="text" name="start_tijd" value="19:00"></label>
+      <label>Wedstrijden per team <input type="number" name="ronden" min="1" max="20" value="4"></label>
+      <label>Teams naar de knockout
+        <select name="ko_teams">
+          <option value="2">2 (meteen de finale)</option>
+          <option value="4">4</option>
+          <option value="8" selected>8</option>
+          <option value="16">16</option>
+          <option value="32">32</option>
+        </select>
+      </label>
+      <label>Aantal potten <input type="number" name="potten" min="1" max="8" value="4"></label>
+      <label>Minuten per wedstrijd <input type="number" name="slot" min="5" max="120" value="20"></label>
+      <button type="submit" class="knop primair">Toernooi aanmaken</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

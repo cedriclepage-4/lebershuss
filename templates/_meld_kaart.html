@@ -1,0 +1,85 @@
+{# Eén geplande wedstrijd met meldformulier.
+   Verwacht: m (item uit speler_wedstrijd_meldingen), namen, actieve_types.
+   Optioneel: volgende (pad om naar terug te keren na het melden). #}
+<div class="kaart {{ 'conflict-kaart' if m.conflict }}">
+  <div class="wedstrijd-teams">
+    <span class="team-naam"><a class="profiel-link" href="{{ url_for('team_profiel', team_id=m.eigen_team) }}">{{ namen[m.eigen_team] }}</a></span>
+    <span class="vs">vs</span>
+    <span class="team-naam"><a class="profiel-link" href="{{ url_for('team_profiel', team_id=m.tegen_team) }}">{{ namen[m.tegen_team] }}</a></span>
+  </div>
+
+  <div class="wedstrijd-context">
+    {% if m.context.soort == 'toernooi' %}
+      <span class="pil pil-toernooi">🥇 Toernooi</span>
+      {% if m.context.url %}<a class="profiel-link" href="{{ m.context.url }}">{{ m.context.naam }}</a>
+      {% else %}{{ m.context.naam }}{% endif %}
+      {% if m.context.detail %}<span class="stil">· {{ m.context.detail }}</span>{% endif %}
+    {% else %}
+      <span class="pil">🏆 League</span>
+      {% if m.context.url %}<a class="profiel-link" href="{{ m.context.url }}">{{ m.context.naam }}</a>
+      {% else %}{{ m.context.naam }}{% endif %}
+      {% if m.context.detail %}<span class="stil">· {{ m.context.detail }}</span>{% endif %}
+    {% endif %}
+  </div>
+
+  <div class="wedstrijd-meta">📅 {{ m.game['scheduled_at']|datum }}{% if m.context.locatie %} · 📍 {{ m.context.locatie }}{% endif %}</div>
+
+  <div class="meld-status">
+    {% if m.eigen %}
+      <span class="pil pil-actief">jouw team meldde: {{ namen[m.eigen['winner_team_id']] }}</span>
+    {% else %}
+      <span class="pil">jouw team heeft nog niet gemeld</span>
+    {% endif %}
+    {% if m.tegen %}
+      <span class="pil {{ 'pil-rood' if m.conflict else 'pil-actief' }}">tegenstanders meldden: {{ namen[m.tegen['winner_team_id']] }}</span>
+    {% else %}
+      <span class="pil">tegenstanders hebben nog niet gemeld</span>
+    {% endif %}
+  </div>
+  {% if m.conflict %}
+  <p class="conflict-tekst">⚠️ De meldingen spreken elkaar tegen. Het resultaat blijft
+     open tot de meldingen overeenkomen of een organisator beslist.</p>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('wedstrijd_melden', game_id=m.game['id']) }}" class="resultaat-form">
+    {% if volgende %}<input type="hidden" name="volgende" value="{{ volgende }}">{% endif %}
+    <div class="resultaat-rij">
+      <span class="veld-label">Wie won?</span>
+    </div>
+    <div class="keuze-groep">
+      <label class="radio"><input type="radio" name="winnaar" value="wij" required
+             {{ 'checked' if m.eigen and m.eigen['winner_team_id'] == m.eigen_team }}>
+             🏆 Wij ({{ namen[m.eigen_team] }})</label>
+      <label class="radio"><input type="radio" name="winnaar" value="zij"
+             {{ 'checked' if m.eigen and m.eigen['winner_team_id'] == m.tegen_team }}>
+             Zij ({{ namen[m.tegen_team] }})</label>
+    </div>
+    {% if actieve_types %}
+    <details class="stats-invul" {{ 'open' if m.heeft_waarden }}>
+      <summary>Statistieken van jouw team (optioneel)</summary>
+      <table class="tabel compact">
+        <thead>
+          <tr><th>Speler</th>
+          {% for st in actieve_types %}<th class="kol-num">{{ st['name'] }}{% if st['unit'] %} ({{ st['unit'] }}){% endif %}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for lid in m.leden %}
+          <tr>
+            <td class="naam">{{ lid['name'] }}{% if lid['id'] == session.get('speler_id') %} <span class="stil">(jij)</span>{% endif %}</td>
+            {% for st in actieve_types %}
+            <td class="kol-num"><input type="number" step="any" min="0" class="stat-input"
+                   name="stat_{{ st['id'] }}_{{ lid['id'] }}"
+                   value="{{ m.waarden.get(lid['id'], {}).get(st['id'], '') }}"></td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% endif %}
+    <div class="resultaat-acties">
+      <button type="submit" class="knop primair">{{ 'Melding aanpassen' if m.eigen else 'Uitslag melden' }}</button>
+    </div>
+  </form>
+</div>

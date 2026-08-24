@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% block titel %}Spelers &amp; teams{% endblock %}
+{% block inhoud %}
+
+<section class="held">
+  <h1>Spelers &amp; teams</h1>
+  <p>Spelers maken zelf hun account aan en vormen zelf hun teams. Hier duid je
+     organisatoren aan, stel je wachtwoorden opnieuw in en verwijder of
+     deactiveer je spelers.</p>
+</section>
+
+{% include "_admin_nav.html" %}
+
+<nav class="anker-nav">
+  <a href="#organisatoren">Organisatoren</a>
+  <a href="#claimen">Accounts opeisen{% if vrij %} ({{ vrij|length }}){% endif %}</a>
+  <a href="#spelers">Spelers</a>
+  <a href="#teams">Teams</a>
+</nav>
+
+<!-- ======================================================= accounts opeisen -->
+<h2 class="sectiekop" id="claimen">Accounts opeisen</h2>
+<div class="kaart">
+  <p class="stil klein-tekst">Je kan spelers vooraf aanmaken (hieronder bij
+     <a class="profiel-link" href="#spelers">Spelers</a>) zonder wachtwoord — bijvoorbeeld
+     uit de inschrijvingen. Zo kan je meteen teams vormen en een toernooi loten,
+     terwijl de spelers zelf nog niets gedaan hebben. Zet daarna het venster hieronder
+     open: iedereen zoekt zijn eigen naam op de opeispagina en kiest een wachtwoord.</p>
+  <p class="stil klein-tekst"><strong>Zet het enkel open terwijl je erbij bent.</strong>
+     Zolang het openstaat kan wie dan ook een van die accounts nemen; daarom staat elke
+     claim in het logboek en kan je een account altijd weer vrijgeven.</p>
+
+  <form method="post" action="{{ url_for('claimvenster_schakelen') }}">
+    <label class="schakel">
+      <input type="checkbox" name="claim_open" value="1" {{ 'checked' if claim_open }}>
+      <span>Accounts mogen opgeëist worden</span>
+    </label>
+    <p class="stil klein-tekst">
+      {%- if claim_open %}Open.{% else %}Dicht. Niemand kan een account opeisen.{% endif %}
+      {% if vrij %}Er wachten <strong>{{ vrij|length }}</strong> account(s) zonder
+      wachtwoord: {{ vrij[:8]|map(attribute='naam')|join(', ') }}{% if vrij|length > 8 %}…{% endif %}.
+      {% else %}Elk account heeft een wachtwoord.{% endif %}</p>
+    <button type="submit" class="knop primair">Opslaan</button>
+  </form>
+
+  <p class="ruimte-boven">
+    <a class="knop" href="{{ url_for('claim_scherm') }}">📺 Toon op het grote scherm</a>
+    <span class="stil klein-tekst">— QR-code voor de beamer; spelers scannen en komen
+      meteen op de opeispagina. Het adres in de code is
+      <code>{{ claim_adres }}</code>{% if not basisadres %} (afgeleid uit jouw adres —
+      klopt dat niet, vul dan het <a class="profiel-link" href="{{ url_for('admin_instellingen') }}#adres">basisadres</a> in){% endif %}.</span>
+  </p>
+
+  {% if claim_log %}
+  <h3 class="ruimte-boven">Logboek</h3>
+  <table class="tabel compact">
+    <thead><tr><th>Wanneer</th><th>Wie</th><th>Wat</th><th class="verbergen-mobiel">Vanaf</th></tr></thead>
+    <tbody>
+      {% for r in claim_log %}
+      <tr>
+        <td class="stil">{{ r['moment']|datum }}</td>
+        <td class="naam">
+          {%- if r['player_id'] %}<a class="profiel-link" href="{{ url_for('speler_profiel', speler_id=r['player_id']) }}">{{ r['naam'] }}</a>
+          {%- else %}{{ r['naam'] }}{% endif %}</td>
+        <td>{% if r['soort'] == 'claim' %}<span class="pil pil-actief">opgeëist</span>
+            {% else %}<span class="pil">vrijgegeven</span>{% endif %}</td>
+        <td class="stil klein-tekst verbergen-mobiel">{{ r['ip'] or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="stil klein-tekst">Nam iemand het verkeerde account? Geef het vrij bij die
+     speler hieronder — het wachtwoord wordt gewist en het account staat weer klaar.</p>
+  {% else %}
+  <p class="stil klein-tekst ruimte-boven">Nog niemand heeft een account opgeëist.</p>
+  {% endif %}
+</div>
+
+<!-- ====================================================== organisatoren -->
+<h2 class="sectiekop" id="organisatoren">Organisatoren</h2>
+<div class="kaart">
+  <p class="stil klein-tekst">Er is geen algemeen adminwachtwoord: wie hier staat,
+     komt met zijn eigen account in het organisatiepaneel. Elke organisator kan
+     iemand erbij nemen, maar enkel de <strong>eigenaar</strong> kan een organisator
+     zijn rol weer afnemen — zo kan niemand de rest buitenzetten. Je eigen rol mag
+     je altijd zelf teruggeven.</p>
+  <table class="tabel compact">
+    <thead><tr><th>Naam</th><th>Rol</th><th>Acties</th></tr></thead>
+    <tbody>
+      {% for p in spelers if p['organisator'] %}
+      <tr>
+        <td class="naam"><a class="profiel-link" href="{{ url_for('speler_profiel', speler_id=p['id']) }}">{{ p['naam'] }}</a>
+          {% if p['ben_ik'] %}<span class="stil">(jij)</span>{% endif %}
+          <span class="stil klein-tekst">#{{ p['id'] }}</span></td>
+        <td>{% if p['role'] == 'eigenaar' %}<span class="pil pil-rol">👑 eigenaar</span>
+            {% else %}<span class="pil pil-rol">organisator</span>{% endif %}</td>
+        <td class="wikkel">
+          {% if p['role'] == 'eigenaar' %}
+            <span class="stil klein-tekst">Kan door niemand afgezet worden.</span>
+          {% else %}
+            <div class="actie-rij">
+              {% if p['mag_degraderen'] %}
+              <form method="post" action="{{ url_for('rol_afnemen', speler_id=p['id']) }}" class="inline-form"
+                    data-confirm="{% if p['ben_ik'] %}Je eigen organisatorrol teruggeven? Je verliest meteen de toegang tot dit paneel.{% else %}“{{ p['naam'] }}” is dan geen organisator meer. Doorgaan?{% endif %}">
+                <button type="submit" class="knop klein {{ 'gevaar' if not p['ben_ik'] }}">
+                  {{ 'Mijn rol teruggeven' if p['ben_ik'] else 'Rol afnemen' }}</button>
+              </form>
+              {% else %}
+              <span class="stil klein-tekst">Enkel de eigenaar kan deze rol afnemen.</span>
+              {% endif %}
+            </div>
+            {% if p['mag_eigenaar_maken'] %}
+            <details class="wis-blok">
+              <summary>Eigenaarschap overdragen…</summary>
+              <form method="post" action="{{ url_for('eigenaarschap_overdragen', speler_id=p['id']) }}">
+                <p class="klein-tekst">Maakt <strong>{{ p['naam'] }}</strong> de nieuwe eigenaar.
+                   Jij blijft organisator, maar kan daarna niemands rol meer afnemen — ook die
+                   van jezelf niet terugnemen. Typ <code>overdragen</code> om te bevestigen.</p>
+                <div class="rij-form">
+                  <input type="text" name="bevestiging" placeholder="overdragen" autocomplete="off"
+                         autocapitalize="none" spellcheck="false" required>
+                  <button type="submit" class="knop gevaar klein">Eigenaarschap overdragen</button>
+                </div>
+              </form>
+            </details>
+            {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not is_eigenaar %}
+  <p class="stil klein-tekst">Ben jij de eigenaar niet meer nodig? Enkel de eigenaar zelf
+     kan het eigenaarschap doorgeven. Raakte de eigenaar zijn account kwijt, dan kan wie
+     aan de server kan een nieuwe aanduiden met
+     <code>python app.py --eigenaar "Naam"</code>.</p>
+  {% endif %}
+</div>
+
+<h2 class="sectiekop" id="spelers">Spelers</h2>
+<div class="kaart">
+  <h3>Speler toevoegen</h3>
+  <p class="stil klein-tekst">Voor wie zich buiten de site om inschreef. De speler kan
+     nog niet inloggen: hij kiest zelf een wachtwoord via
+     <a class="profiel-link" href="#claimen">Accounts opeisen</a>.</p>
+  <form method="post" action="{{ url_for('speler_toevoegen') }}" class="rij-form">
+    <input type="text" name="naam" placeholder="Echte voor- en achternaam" maxlength="40" required>
+    <input type="text" name="bijnaam" placeholder="Bijnaam (optioneel)" maxlength="30">
+    <button type="submit" class="knop primair">Toevoegen</button>
+  </form>
+</div>
+
+<div class="kaart">
+  {% if spelers %}
+  <div class="zoekbalk"><input type="search" placeholder="Zoek een speler op naam of nummer…" data-zoek="#spelertabel"></div>
+  <table class="tabel" id="spelertabel">
+    <thead><tr><th class="kol-rang">#</th><th>Naam</th><th>Foto</th><th class="kol-elo">ELO</th><th class="kol-num verbergen-mobiel">Wedstrijden in {{ maand_label }}</th><th>Status</th><th>Acties</th></tr></thead>
+    <tbody>
+      {% for p in spelers %}
+      <tr>
+        <td class="kol-rang stil zoekbaar">{{ p['id'] }}</td>
+        <td class="naam"><a class="profiel-link met-avatar" href="{{ url_for('speler_profiel', speler_id=p['id']) }}">
+          {%- if p['avatar'] %}<img class="avatar-mini" src="{{ url_for('media', bestand=p['avatar']) }}" alt="">
+          {%- else %}<span class="avatar-mini avatar-fallback">{{ p['naam'][0]|upper }}</span>{% endif %} {{ p['naam'] }}</a>{% if p['nickname'] %} <span class="stil">({{ p['name'] }})</span>{% endif %}{% if p['ben_ik'] %} <span class="stil">— jij</span>{% endif %}</td>
+        <td>
+          {% if p['avatar'] %}
+          <form method="post" action="{{ url_for('speler_avatar_wissen', speler_id=p['id']) }}"
+                data-confirm="De profielfoto van “{{ p['name'] }}” verwijderen?">
+            <button type="submit" class="knop gevaar klein">Foto wissen</button>
+          </form>
+          {% else %}<span class="stil klein-tekst">geen</span>{% endif %}
+        </td>
+        <td class="kol-elo"><span class="elo-badge">{{ p['elo']|elo }}</span></td>
+        <td class="kol-num verbergen-mobiel">{{ p['deze_maand'] }}</td>
+        <td class="pil-stapel">
+          {% if p['active'] %}<span class="pil pil-actief">actief</span>{% else %}<span class="pil">inactief</span>{% endif %}
+          {% if p['role'] == 'eigenaar' %}<span class="pil pil-rol">👑 eigenaar</span>
+          {% elif p['role'] == 'admin' %}<span class="pil pil-rol">organisator</span>{% endif %}
+          {% if not p['password_hash'] %}<span class="pil">geen wachtwoord</span>{% endif %}
+        </td>
+        <td>
+          {% if p['mag_beheren'] or p['ben_ik'] %}
+          <div class="actie-rij">
+            <form method="post" action="{{ url_for('speler_wachtwoord_reset', speler_id=p['id']) }}" class="inline-form">
+              <input type="password" name="nieuw" placeholder="Nieuw wachtwoord" minlength="6" required class="mini-input">
+              <button type="submit" class="knop klein">Reset</button>
+            </form>
+            {% if p['password_hash'] and not p['ben_ik'] %}
+            <form method="post" action="{{ url_for('speler_vrijgeven', speler_id=p['id']) }}" class="inline-form"
+                  data-confirm="Het wachtwoord van “{{ p['naam'] }}” wissen? Het account kan dan door de speler zelf opnieuw opgeëist worden.">
+              <button type="submit" class="knop klein">Vrijgeven</button>
+            </form>
+            {% endif %}
+            {% if not p['ben_ik'] %}
+            <form method="post" action="{{ url_for('speler_verwijderen', speler_id=p['id']) }}" class="inline-form"
+                  data-confirm="{% if p['active'] %}“{{ p['naam'] }}” deactiveren? Hij verdwijnt uit het klassement, de historiek blijft.{% else %}“{{ p['naam'] }}” opnieuw activeren?{% endif %}">
+              <button type="submit" class="knop {{ 'gevaar' if p['active'] }} klein">
+                {% if p['active'] %}Deactiveren{% else %}Activeren{% endif %}
+              </button>
+            </form>
+            {% endif %}
+            {% if p['mag_promoveren'] %}
+            <form method="post" action="{{ url_for('rol_toekennen', speler_id=p['id']) }}" class="inline-form"
+                  data-confirm="“{{ p['naam'] }}” organisator maken? Hij kan dan wedstrijden, seizoenen en toernooien beheren.">
+              <button type="submit" class="knop klein">Maak organisator</button>
+            </form>
+            {% endif %}
+          </div>
+          <details class="wis-blok zacht">
+            <summary>Naam corrigeren…</summary>
+            <form method="post" action="{{ url_for('speler_naam_corrigeren', speler_id=p['id']) }}">
+              <p class="klein-tekst">De echte naam ligt vast voor de speler zelf; als
+                 organisator kan je een typfout rechtzetten. Let op: hiermee verandert
+                 ook zijn login.</p>
+              <div class="rij-form">
+                <input type="text" name="naam" value="{{ p['name'] }}" maxlength="40" required>
+                <button type="submit" class="knop klein">Naam opslaan</button>
+              </div>
+            </form>
+          </details>
+          <details class="wis-blok">
+            <summary>Definitief verwijderen…</summary>
+            {% if p['verwijderbaar'] %}
+            <form method="post" action="{{ url_for('speler_definitief_verwijderen', speler_id=p['id']) }}">
+              <p class="klein-tekst">Wist <strong>{{ p['naam'] }}</strong> (#{{ p['id'] }})
+                 volledig en onherroepelijk. Typ <code>verwijder</code> om te bevestigen.</p>
+              <div class="rij-form">
+                <input type="text" name="bevestiging" placeholder="verwijder" autocomplete="off"
+                       autocapitalize="none" spellcheck="false" required>
+                <button type="submit" class="knop gevaar klein">Definitief verwijderen</button>
+              </div>
+            </form>
+            {% else %}
+            <p class="klein-tekst conflict-tekst">Kan niet: {{ p['wis_blokkade'] }}</p>
+            {% endif %}
+          </details>
+          {% else %}
+          <span class="stil klein-tekst">{{ p['wis_blokkade'] }}</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="stil klein-tekst">Het maandelijkse aantal is informatief: jullie beslissen zelf hoeveel
+     wedstrijden een speler per maand mag spelen.</p>
+  {% else %}
+  <p class="stil">Nog geen spelers.</p>
+  {% endif %}
+</div>
+
+<h2 class="sectiekop" id="teams">Teams</h2>
+<div class="kaart">
+  <h3>Team samenstellen</h3>
+  <p class="stil klein-tekst">Normaal nodigt speler 1 zijn maat uit en aanvaardt die.
+     Hier zet je in één keer een <strong>actief</strong> team klaar — handig bij
+     inschrijvingen waarin het duo al vastligt.</p>
+  <form method="post" action="{{ url_for('team_toevoegen') }}" class="rij-form">
+    <input type="text" name="naam" placeholder="Teamnaam" maxlength="40" required>
+    <select name="speler1" required>
+      <option value="" disabled selected>Speler 1…</option>
+      {% for p in spelers %}<option value="{{ p['id'] }}">{{ p['naam'] }} (#{{ p['id'] }})</option>{% endfor %}
+    </select>
+    <select name="speler2" required>
+      <option value="" disabled selected>Speler 2…</option>
+      {% for p in spelers %}<option value="{{ p['id'] }}">{{ p['naam'] }} (#{{ p['id'] }})</option>{% endfor %}
+    </select>
+    <button type="submit" class="knop primair">Team aanmaken</button>
+  </form>
+</div>
+
+<div class="kaart">
+  {% if teams %}
+  <div class="zoekbalk"><input type="search" placeholder="Zoek een team of een speler…" data-zoek="#teamtabel"></div>
+  <table class="tabel compact" id="teamtabel">
+    <thead><tr><th>Team</th><th class="wikkel">Spelers</th><th>Foto</th><th class="kol-elo">ELO</th><th>Status</th><th>Verwijderen</th></tr></thead>
+    <tbody>
+      {% for t in teams %}
+      <tr>
+        <td class="naam"><a class="profiel-link met-avatar" href="{{ url_for('team_profiel', team_id=t.id) }}">
+          {%- if t.avatar %}<img class="avatar-mini" src="{{ url_for('media', bestand=t.avatar) }}" alt="">
+          {%- else %}<span class="avatar-mini avatar-fallback">{{ t.naam[0]|upper }}</span>{% endif %} {{ t.naam }}</a></td>
+        <td class="stil wikkel zoekbaar">{{ t.leden }}</td>
+        <td>
+          {% if t.avatar %}
+          <form method="post" action="{{ url_for('team_avatar_wissen', team_id=t.id) }}"
+                data-confirm="De teamfoto van “{{ t.naam }}” verwijderen?">
+            <button type="submit" class="knop gevaar klein">Foto wissen</button>
+          </form>
+          {% else %}<span class="stil klein-tekst">geen</span>{% endif %}
+        </td>
+        <td class="kol-elo">{{ t.elo|elo }}</td>
+        <td>{% if t.status == 'actief' %}<span class="pil pil-actief">actief</span>
+            {% else %}<span class="pil">wacht op antwoord</span>{% endif %}</td>
+        <td class="wikkel">
+          <details class="wis-blok">
+            <summary>Definitief verwijderen…</summary>
+            {% if t.blokkerend %}
+            <p class="klein-tekst conflict-tekst">Kan niet: speelt nog mee in
+               {{ t.blokkerend|join(', ') }}. Rond dat toernooi eerst af.</p>
+            {% else %}
+            <form method="post" action="{{ url_for('team_definitief_verwijderen', team_id=t.id) }}">
+              <p class="klein-tekst">Wist <strong>{{ t.naam }}</strong> en zijn
+                 {{ t.wedstrijden }} wedstrijd(en). Alle ELO wordt herberekend alsof
+                 die nooit gespeeld zijn. Typ <code>verwijder</code> om te bevestigen.</p>
+              <div class="rij-form">
+                <input type="text" name="bevestiging" placeholder="verwijder" autocomplete="off"
+                       autocapitalize="none" spellcheck="false" required>
+                <button type="submit" class="knop gevaar klein">Definitief verwijderen</button>
+              </div>
+            </form>
+            {% endif %}
+          </details>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="stil klein-tekst">Teams worden door de spelers zelf gemaakt: speler 1 nodigt uit,
+     speler 2 aanvaardt. Pas dan kan het team wedstrijden spelen.</p>
+  {% else %}
+  <p class="stil">Nog geen teams.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

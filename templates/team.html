@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block titel %}{{ naam }}{% endblock %}
+{% block inhoud %}
+
+<section class="held profiel-kop">
+  <div class="profiel-rij">
+    {% if team['avatar'] %}<img class="avatar-groot" src="{{ url_for('media', bestand=team['avatar']) }}" alt="">
+    {% else %}<span class="avatar-groot avatar-fallback">{{ naam[0]|upper }}</span>{% endif %}
+    <div>
+      <h1>{{ naam }}
+        {% if team['status'] != 'actief' %}<span class="pil">wacht op aanvaarding</span>{% endif %}
+      </h1>
+      <p>Team van
+        {% for lid in leden %}<a class="profiel-link" href="{{ url_for('speler_profiel', speler_id=lid['id']) }}">{{ lid['name'] }}</a>{{ " en " if not loop.last }}{% endfor %}.
+        Samen sinds {{ team['created_at']|datum }}.</p>
+      {% if team['description'] %}<p class="team-beschrijving">“{{ team['description'] }}”</p>{% endif %}
+    </div>
+  </div>
+  <div class="held-cijfers">
+    <div class="cijfer"><strong>{{ team['elo']|elo }}</strong><span>team-ELO</span></div>
+    <div class="cijfer"><strong>{{ stats['gespeeld'] }}</strong><span>gespeeld</span></div>
+    <div class="cijfer"><strong>{{ stats['winst'] }}</strong><span>gewonnen</span></div>
+    <div class="cijfer"><strong>{{ verlies }}</strong><span>verloren</span></div>
+    {% if pct is not none %}<div class="cijfer"><strong>{{ pct|round|int }}%</strong><span>winstpercentage</span></div>{% endif %}
+  </div>
+</section>
+
+{% if is_lid %}
+<div class="kaart">
+  <h3>Teaminstellingen</h3>
+  <form method="post" action="{{ url_for('team_bewerken', team_id=team['id']) }}" enctype="multipart/form-data">
+    <label>Teamnaam <input type="text" name="naam" maxlength="40" value="{{ team['name'] }}" required></label>
+    <label>Beschrijving (optioneel)
+      <input type="text" name="beschrijving" maxlength="200" value="{{ team['description'] }}"></label>
+    <label>Teamfoto (png, jpg, webp of gif — max. 3 MB)
+      <input type="file" name="avatar" accept=".png,.jpg,.jpeg,.webp,.gif"></label>
+    <button type="submit" class="knop primair">Opslaan</button>
+  </form>
+  {% if not heeft_games %}
+  <form method="post" action="{{ url_for('team_opheffen', team_id=team['id']) }}" class="ruimte-boven"
+        data-confirm="Team “{{ team['name'] }}” opheffen?">
+    <button type="submit" class="knop gevaar klein">Team opheffen</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
+{% include "_palmares.html" %}
+
+{% if punten|length >= 2 %}
+<h2 class="sectiekop">ELO-verloop</h2>
+<div class="kaart">
+  <div id="elo-grafiek" class="elo-grafiek"></div>
+  <p class="stil klein-tekst">Beweeg over de lijn om per wedstrijd de rating én de plaats
+     in het teamklassement op dat moment te zien.</p>
+</div>
+<script>window.ELO_PUNTEN = {{ punten|tojson }};</script>
+{% endif %}
+
+<h2 class="sectiekop">Wedstrijdhistoriek</h2>
+{% if historiek %}
+<div class="kaart">
+  <table class="tabel compact">
+    <thead><tr><th>Datum</th><th>Soort</th><th>Tegen</th><th>Resultaat</th><th class="kol-num">ELO</th></tr></thead>
+    <tbody>
+      {% for h in historiek %}
+      <tr>
+        <td>{{ h.game['played_at']|datum }}</td>
+        <td>{% if h.game['tournament_id'] %}<span class="pil pil-toernooi">{{ h.game|fase }}</span>{% else %}<span class="pil">league</span>{% endif %}</td>
+        <td class="naam"><a class="profiel-link" href="{{ url_for('team_profiel', team_id=h.tegen_team) }}">{{ namen[h.tegen_team] }}</a></td>
+        <td>{% if h.gewonnen %}<span class="pil pil-actief">gewonnen</span>{% else %}<span class="pil pil-rood">verloren</span>{% endif %}</td>
+        <td class="kol-num">
+          {% if h.delta is not none %}
+            <span class="delta {{ 'plus' if h.delta >= 0 else 'min' }}">{{ '+' if h.delta >= 0 }}{{ h.delta|round|int }}</span>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="kaart leeg">Dit team heeft nog geen wedstrijden gespeeld.</div>
+{% endif %}
+
+{% endblock %}

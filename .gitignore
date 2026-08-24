@@ -1,0 +1,24 @@
+# De competitie zelf hoort niet in git: die staat op de server.
+shuss.db
+shuss.db-journal
+shuss.db-wal
+shuss.db-shm
+shuss_backup_*.db
+shuss_oud_*.db
+backups/
+
+# Geheimen en door spelers geüploade bestanden
+.secret_key
+static/uploads/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors en besturingssystemen
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

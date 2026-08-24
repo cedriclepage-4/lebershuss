@@ -1,0 +1,382 @@
+# -*- coding: utf-8 -*-
+"""Simulatie: bouwt een testdatabase, speelt een volledig toernooi uit en
+controleert of stand, shootouts, knockout en ELO's kloppen.
+
+    python test_toernooi.py
+
+Deze test raakt shuss.db NIET aan: hij werkt in een tijdelijke map.
+"""
+
+import os
+import random
+import shutil
+import sys
+import tempfile
+
+WERKMAP = tempfile.mkdtemp(prefix="shuss_test_")
+BRON = os.path.dirname(os.path.abspath(__file__))
+for naam in ("app.py", "database.py", "elo.py", "tournament.py"):
+    shutil.copy(os.path.join(BRON, naam), WERKMAP)
+shutil.copytree(os.path.join(BRON, "templates"), os.path.join(WERKMAP, "templates"))
+shutil.copytree(os.path.join(BRON, "static"), os.path.join(WERKMAP, "static"),
+                ignore=shutil.ignore_patterns("uploads"))
+sys.path.insert(0, WERKMAP)
+os.chdir(WERKMAP)
+
+import app as shuss                                              # noqa: E402
+import tournament as tm                                          # noqa: E402
+from database import verbind                                     # noqa: E402
+
+DB = os.path.join(WERKMAP, "shuss.db")
+FOUTEN = []
+
+
+def check(voorwaarde, tekst):
+    print(("  ✔ " if voorwaarde else "  ✘ ") + tekst)
+    if not voorwaarde:
+        FOUTEN.append(tekst)
+
+
+def db():
+    return verbind(DB)
+
+
+# ----------------------------------------------------------------- opzet --
+print("\n== Testgegevens aanmaken ==")
+conn = db()
+for i in range(1, 25):
+    conn.execute("INSERT INTO players (name, nickname) VALUES (?, ?)",
+                 (f"Speler {i:02d}", ""))
+for t in range(12):
+    conn.execute("INSERT INTO teams (name, player1_id, player2_id, status) "
+                 "VALUES (?, ?, ?, 'actief')",
+                 (f"Team {chr(65 + t)}", 2 * t + 1, 2 * t + 2))
+conn.execute("INSERT INTO seasons (name, start_date, end_date) "
+             "VALUES ('Testseizoen', '2026-01-01', '2026-12-31')")
+conn.execute("INSERT INTO matchdays (season_id, title, date) "
+             "VALUES (1, 'Speeldag 1', '2026-02-01')")
+conn.commit()
+check(conn.execute("SELECT COUNT(*) FROM teams").fetchone()[0] == 12, "12 teams aangemaakt")
+
+# Een paar ligawedstrijden zodat de permanente ELO al uiteenloopt.
+rng = random.Random(7)
+for n in range(14):
+    a, b = rng.sample(range(1, 13), 2)
+    conn.execute("INSERT INTO games (team1_id, team2_id, matchday_id, fase, scheduled_at, "
+                 "played_at, status, winner_team_id) VALUES (?, ?, 1, 'liga', ?, ?, "
+                 "'gespeeld', ?)", (a, b, f"2026-02-01T{10 + n // 4}:00",
+                                    f"2026-02-01T{10 + n // 4}:30", rng.choice([a, b])))
+conn.commit()
+shuss.herbereken_alles(conn)
+
+elos = [r[0] for r in conn.execute("SELECT elo FROM players")]
+check(abs(sum(elos) - 24 * 1000) < 1e-6, "permanente speler-ELO blijft in balans (nulsom)")
+seizoen = conn.execute("SELECT COUNT(*) FROM season_ratings WHERE season_id = 1").fetchone()[0]
+check(seizoen > 0, f"seizoensratings berekend ({seizoen} rijen)")
+sr = {r["entity_id"]: r["elo"] for r in conn.execute(
+    "SELECT entity_id, elo FROM season_ratings WHERE entity_type = 'speler'")}
+perm = {r["id"]: r["elo"] for r in conn.execute("SELECT id, elo FROM players")}
+check(all(abs(sr[p] - perm[p]) < 1e-9 for p in sr),
+      "zonder toernooien is de seizoens-ELO gelijk aan de permanente ELO")
+
+# --------------------------------------------------------------- toernooi --
+print("\n== Toernooi genereren ==")
+conn.execute("""INSERT INTO tournaments (name, date, start_tijd, bracket_ronden,
+                ko_teams, potten, slot_minuten)
+                VALUES ('Testtoernooi', '2026-03-07', '19:00', 5, 4, 4, 20)""")
+for t in range(1, 13):
+    conn.execute("INSERT INTO tournament_teams (tournament_id, team_id) VALUES (1, ?)", (t,))
+for naam in ("Tafel 1", "Tafel 2", "Tuintafel"):
+    conn.execute("INSERT INTO tournament_locations (tournament_id, name) VALUES (1, ?)", (naam,))
+conn.commit()
+
+check(tm.controleer(conn, 1) is None, "controle keurt de opzet goed")
+ok, boodschap = tm.genereer(conn, 1, rng=random.Random(3))
+check(ok, f"generatie: {boodschap}")
+
+games = conn.execute("SELECT * FROM games WHERE tournament_id = 1").fetchall()
+check(len(games) == 30, f"30 bracketwedstrijden (12 teams × 5 / 2), gekregen: {len(games)}")
+
+per_team = {}
+paren = set()
+for g in games:
+    for kant in (g["team1_id"], g["team2_id"]):
+        per_team[kant] = per_team.get(kant, 0) + 1
+    paren.add(tuple(sorted((g["team1_id"], g["team2_id"]))))
+check(all(v == 5 for v in per_team.values()), "elk team speelt exact 5 wedstrijden")
+check(len(paren) == len(games), "geen enkele affiche komt twee keer voor")
+
+# Tafels: nooit meer wedstrijden tegelijk dan er tafels zijn, en geen team dubbel.
+bezet = {}
+for g in games:
+    bezet.setdefault(g["scheduled_at"], []).append(g)
+check(all(len(v) <= 3 for v in bezet.values()), "nooit meer dan 3 wedstrijden tegelijk")
+check(len(bezet) == 10, f"30 wedstrijden op 3 tafels = 10 speelrondes, het "
+                        f"theoretische minimum (gekregen: {len(bezet)})")
+check(all(len({x["location_id"] for x in v}) == len(v) for v in bezet.values()),
+      "elke tafel is per tijdslot maar één keer bezet")
+check(all(len({x["team1_id"] for x in v} | {x["team2_id"] for x in v}) == 2 * len(v)
+          for v in bezet.values()), "geen team speelt twee wedstrijden tegelijk")
+
+potten = {r["team_id"]: r["pot"] for r in conn.execute(
+    "SELECT team_id, pot FROM tournament_teams WHERE tournament_id = 1")}
+check(sorted(potten.values()) == sorted([1, 2, 3, 4] * 3), "vier potten van drie teams")
+sterkste = max(perm, key=lambda p: perm[p])
+check(all(v is not None for v in potten.values()), "elk team zit in een pot")
+
+# ------------------------------------------------------------ uitspelen --
+print("\n== Bracketfase uitspelen ==")
+
+
+def speel(game, winnaar=None):
+    winnaar = winnaar or rng.choice([game["team1_id"], game["team2_id"]])
+    conn.execute("UPDATE games SET status = 'gespeeld', winner_team_id = ?, played_at = ? "
+                 "WHERE id = ?", (winnaar, game["scheduled_at"], game["id"]))
+    conn.commit()
+
+
+ronde = 0
+while True:
+    open_games = conn.execute(
+        "SELECT * FROM games WHERE tournament_id = 1 AND status = 'gepland' "
+        "AND team1_id IS NOT NULL ORDER BY scheduled_at, id").fetchall()
+    if not open_games:
+        break
+    for g in open_games:
+        speel(g)
+    shuss.herbereken_alles(conn)
+    meldingen = tm.evalueer(conn, 1)
+    for m in meldingen:
+        print("    →", m)
+    ronde += 1
+    if ronde > 12:
+        check(False, "de toernooilus blijft hangen")
+        break
+
+t = tm.toernooi(conn, 1)
+check(t["status"] == "afgelopen", f"toernooi afgelopen (status: {t['status']})")
+
+geordend, beslissend = tm.stand(conn, 1)
+check(not beslissend, "geen onbesliste plaatsen meer")
+check(len(geordend) == 12, "alle 12 teams staan in de stand")
+punten = [r["punten"] for r in geordend]
+check(punten == sorted(punten, reverse=True), "de stand is aflopend gesorteerd op punten")
+check(sum(r["gespeeld"] for r in geordend) == 60, "60 teamdeelnames in de bracketfase")
+
+ko = conn.execute("SELECT * FROM games WHERE tournament_id = 1 AND fase = 'knockout' "
+                  "ORDER BY ronde DESC, positie").fetchall()
+check(len(ko) == 3, f"knockout: 2 halve finales + finale (gekregen: {len(ko)})")
+halve = [g for g in ko if g["ronde"] == 4]
+geplaatst = [r["team_id"] for r in geordend[:4]]
+check(sorted([halve[0]["team1_id"], halve[0]["team2_id"]]) ==
+      sorted([geplaatst[0], geplaatst[3]]), "halve finale 1 = nummer 1 tegen nummer 4")
+check(sorted([halve[1]["team1_id"], halve[1]["team2_id"]]) ==
+      sorted([geplaatst[1], geplaatst[2]]), "halve finale 2 = nummer 2 tegen nummer 3")
+finale = [g for g in ko if g["ronde"] == 2][0]
+check(finale["status"] == "gespeeld" and finale["winner_team_id"], "de finale is gespeeld")
+check({finale["team1_id"], finale["team2_id"]} ==
+      {halve[0]["winner_team_id"], halve[1]["winner_team_id"]},
+      "de finalisten zijn de winnaars van de halve finales")
+
+# ------------------------------------------------------------------ elo --
+print("\n== ELO-controle ==")
+shuss.herbereken_alles(conn)
+elos = [r[0] for r in conn.execute("SELECT elo FROM players")]
+check(abs(sum(elos) - 24 * 1000) < 1e-6, "permanente ELO blijft een nulsomspel")
+
+sr2 = {r["entity_id"]: r["elo"] for r in conn.execute(
+    "SELECT entity_id, elo FROM season_ratings WHERE entity_type = 'speler'")}
+check(all(abs(sr2[p] - sr[p]) < 1e-9 for p in sr),
+      "toernooiwedstrijden wijzigen de seizoens-ELO NIET")
+perm2 = {r["id"]: r["elo"] for r in conn.execute("SELECT id, elo FROM players")}
+check(any(abs(perm2[p] - perm[p]) > 1e-6 for p in perm2),
+      "toernooiwedstrijden wijzigen de permanente ELO WEL")
+
+kampioen = finale["winner_team_id"]
+leden = conn.execute("SELECT player1_id, player2_id FROM teams WHERE id = ?",
+                     (kampioen,)).fetchone()
+fin_delta = conn.execute("""
+    SELECT elo_na - elo_voor AS d FROM rating_history
+    WHERE game_id = ? AND entity_type = 'speler' AND entity_id = ? AND scope = 'permanent'
+""", (finale["id"], leden[0])).fetchone()["d"]
+brackets = [r["d"] for r in conn.execute("""
+    SELECT rh.elo_na - rh.elo_voor AS d FROM rating_history rh
+    JOIN games g ON g.id = rh.game_id
+    WHERE g.fase = 'bracket' AND rh.entity_id = ? AND rh.entity_type = 'speler'
+      AND rh.scope = 'permanent' AND rh.elo_na > rh.elo_voor
+""", (leden[0],))]
+check(fin_delta > 0, f"de finalewinst levert ELO op (+{fin_delta:.1f})")
+if brackets:
+    check(fin_delta > max(brackets),
+          f"finale (+{fin_delta:.1f}) weegt zwaarder dan elke bracketwinst "
+          f"(max +{max(brackets):.1f})")
+
+# -------------------------------------------------------- oneven teams --
+print("\n== Oneven aantal teams ==")
+for naam in ("Speler 25", "Speler 26"):
+    conn.execute("INSERT INTO players (name) VALUES (?)", (naam,))
+conn.execute("INSERT INTO teams (name, player1_id, player2_id, status) "
+             "VALUES ('Team M', 25, 26, 'actief')")
+conn.execute("""INSERT INTO tournaments (name, date, start_tijd, bracket_ronden,
+                ko_teams, potten, slot_minuten)
+                VALUES ('Onevencup', '2026-04-04', '19:00', 3, 4, 4, 20)""")
+for t in range(1, 14):
+    conn.execute("INSERT INTO tournament_teams (tournament_id, team_id) VALUES (2, ?)", (t,))
+for naam in ("Tafel 1", "Tafel 2"):
+    conn.execute("INSERT INTO tournament_locations (tournament_id, name) VALUES (2, ?)",
+                 (naam,))
+conn.commit()
+
+melding = tm.controleer(conn, 2)
+check(melding is not None and "even aantal wedstrijden" in melding,
+      "13 teams × 3 wedstrijden wordt geweigerd met uitleg")
+conn.execute("UPDATE tournaments SET bracket_ronden = 4 WHERE id = 2")
+conn.commit()
+check(tm.controleer(conn, 2) is None, "13 teams × 4 wedstrijden wordt aanvaard")
+
+ok, boodschap = tm.genereer(conn, 2, rng=random.Random(9))
+check(ok, f"generatie met 13 teams: {boodschap}")
+games2 = conn.execute("SELECT * FROM games WHERE tournament_id = 2").fetchall()
+per_team2 = defaultdict(int) if False else {}
+paren2 = set()
+for g in games2:
+    for kant in (g["team1_id"], g["team2_id"]):
+        per_team2[kant] = per_team2.get(kant, 0) + 1
+    paren2.add(tuple(sorted((g["team1_id"], g["team2_id"]))))
+check(len(games2) == 26, f"26 wedstrijden (13 × 4 / 2), gekregen: {len(games2)}")
+check(sorted(set(per_team2.values())) == [4], "élk team speelt exact 4 wedstrijden")
+check(len(per_team2) == 13, "alle 13 teams komen aan de beurt")
+check(len(paren2) == len(games2), "geen dubbele affiches")
+
+bezet2 = {}
+for g in games2:
+    bezet2.setdefault(g["scheduled_at"], []).append(g)
+check(all(len({x["team1_id"] for x in v} | {x["team2_id"] for x in v}) == 2 * len(v)
+          for v in bezet2.values()), "geen team speelt twee wedstrijden tegelijk")
+check(all(len(v) <= 2 for v in bezet2.values()), "nooit meer wedstrijden dan tafels")
+rondes2 = {g["ronde"] for g in games2}
+check(len(rondes2) == 13, f"26 wedstrijden op 2 tafels = 13 speelrondes, het "
+                          f"theoretische minimum (gekregen: {len(rondes2)})")
+check(all(len(v) == 2 for v in bezet2.values()),
+      "beide tafels zijn in élke speelronde bezet (geen leegloop)")
+
+# ------------------------------------------------------------- pagina's --
+print("\n== Pagina's opvragen ==")
+shuss.app.config["TESTING"] = True
+klant = shuss.app.test_client()
+# Organisator zijn = ingelogd zijn met een account dat die rol heeft.
+conn.execute("UPDATE players SET role ='eigenaar' WHERE id = 1")
+conn.commit()
+with klant.session_transaction() as s:
+    s["speler_id"] = 1
+for pad in ["/", "/wedstrijden", "/statistieken", "/seizoenen", "/seizoen/1",
+            "/speler/1", "/team/1", "/toernooien", "/toernooi/1", "/toernooi/1/loting",
+            "/admin", "/admin/spelers", "/admin/toernooi/1"]:
+    antwoord = klant.get(pad)
+    check(antwoord.status_code == 200, f"{pad} → {antwoord.status_code}")
+
+# Een gewone speler mag niet in het organisatiepaneel.
+conn.execute("UPDATE players SET role ='speler' WHERE id = 1")
+conn.commit()
+check(klant.get("/admin").status_code == 302, "gewone speler wordt weggestuurd bij /admin")
+check(klant.get("/admin/spelers").status_code == 302,
+      "gewone speler wordt weggestuurd bij /admin/spelers")
+
+# ------------------------------------------------- league aan en uit --
+print("\n== Leaguegedeelte aan- en uitzetten ==")
+LEAGUE_PADEN = ["/", "/wedstrijden", "/statistieken", "/seizoenen", "/seizoen/1"]
+
+
+def zet_league(aan):
+    conn.execute("UPDATE settings SET value = ? WHERE key = 'league_actief'",
+                 ("1" if aan else "0",))
+    conn.commit()
+
+
+zet_league(False)      # speler_id 1 is hier een gewone speler
+check(all(klant.get(p).status_code == 302 for p in LEAGUE_PADEN),
+      "met de league uit komt een speler op geen enkele leaguepagina")
+check(klant.get("/").headers["Location"].endswith("/toernooien"),
+      "de startpagina wordt dan de toernooipagina")
+check(klant.get("/toernooien").status_code == 200, "het toernooi blijft gewoon open")
+check("sectie-keuze" not in klant.get("/toernooien").get_data(as_text=True),
+      "de keuzebalk League/Toernooi verdwijnt")
+
+conn.execute("UPDATE players SET role = 'eigenaar' WHERE id = 1")
+conn.commit()
+check(all(klant.get(p).status_code == 200 for p in LEAGUE_PADEN),
+      "een organisator ziet de leaguepagina's ook als ze uit staan")
+
+zet_league(True)
+conn.execute("UPDATE players SET role = 'speler' WHERE id = 1")
+conn.commit()
+check(all(klant.get(p).status_code == 200 for p in LEAGUE_PADEN),
+      "met de league aan ziet iedereen ze weer")
+check("sectie-keuze" in klant.get("/toernooien").get_data(as_text=True),
+      "en is de keuzebalk League/Toernooi terug")
+
+# --------------------------------------------- accounts opeisen (claim) --
+print("\n== Accounts opeisen ==")
+conn.execute("INSERT INTO players (id, name, elo) VALUES (4242, 'Nieuwe Speler', 1000)")
+conn.commit()
+gast = shuss.app.test_client()
+
+
+def zet_claim(open_):
+    conn.execute("UPDATE settings SET value = ? WHERE key = 'claim_open'",
+                 ("1" if open_ else "0",))
+    conn.commit()
+
+
+def claim(client, **data):
+    return client.post("/claimen/4242", data=data, follow_redirects=True).get_data(as_text=True)
+
+
+zet_claim(False)
+claim(gast, wachtwoord="zomaar123", herhaal="zomaar123")
+check(conn.execute("SELECT password_hash FROM players WHERE id = 4242").fetchone()[0] is None,
+      "met het venster dicht kan een account niet opgeëist worden")
+check(gast.get("/claimen", follow_redirects=True).request.path == "/inloggen",
+      "en is de keuzelijst zelf ook niet te openen")
+
+zet_claim(True)
+check("/claimen/4242" in gast.get("/claimen").get_data(as_text=True),
+      "stap 1 toont de naam als aanklikbare keuze")
+check('type="password"' not in gast.get("/claimen").get_data(as_text=True),
+      "stap 1 vraagt nog niets in te vullen")
+check('name="bijnaam"' in gast.get("/claimen/4242").get_data(as_text=True),
+      "stap 2 vraagt bijnaam en wachtwoord voor die ene naam")
+
+claim(gast, wachtwoord="kort", herhaal="kort")
+check(conn.execute("SELECT password_hash FROM players WHERE id = 4242").fetchone()[0] is None,
+      "een te kort wachtwoord wordt geweigerd")
+claim(gast, wachtwoord="zomaar123", herhaal="anders123")
+check(conn.execute("SELECT password_hash FROM players WHERE id = 4242").fetchone()[0] is None,
+      "twee verschillende wachtwoorden worden geweigerd")
+
+claim(gast, bijnaam="Nieuweling", wachtwoord="zomaar123", herhaal="zomaar123")
+rij = conn.execute("SELECT name, nickname, password_hash FROM players WHERE id = 4242").fetchone()
+check(rij["password_hash"] is not None, "met het venster open lukt het opeisen wel")
+check(rij["name"] == "Nieuwe Speler", "de echte naam blijft onaangeroerd bij het opeisen")
+check(rij["nickname"] == "Nieuweling", "de gekozen bijnaam is bewaard")
+check(conn.execute("SELECT COUNT(*) FROM claim_log WHERE player_id = 4242 "
+                   "AND soort = 'claim'").fetchone()[0] == 1, "de claim staat in het logboek")
+
+tweede = shuss.app.test_client()
+claim(tweede, wachtwoord="kaper1234", herhaal="kaper1234")
+check(conn.execute("SELECT password_hash FROM players WHERE id = 4242").fetchone()[0]
+      == rij["password_hash"], "een tweede claim van hetzelfde account verandert niets")
+check(tweede.get("/claimen/4242", follow_redirects=True).request.path == "/claimen",
+      "wie te laat is, komt terug bij de keuzelijst")
+check("Nieuwe Speler" not in gast.get("/claimen").get_data(as_text=True),
+      "een opgeëist account staat niet meer in de lijst")
+zet_claim(False)
+
+print("\n" + "=" * 60)
+if FOUTEN:
+    print(f"❌ {len(FOUTEN)} test(s) gefaald:")
+    for f in FOUTEN:
+        print("   -", f)
+    sys.exit(1)
+print("✅ Alle tests geslaagd.")
+print("=" * 60)

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block titel %}Rangen &amp; statistieken{% endblock %}
+{% block inhoud %}
+
+<section class="held">
+  <h1>Rangen &amp; statistieken</h1>
+  <p>Zelf te bepalen rangen op basis van ELO, en eigen statistieken die spelers bij
+     elke uitslag kunnen invullen.</p>
+</section>
+
+{% include "_admin_nav.html" %}
+
+<h2 class="sectiekop" id="rangen">Rangen</h2>
+<div class="kaart">
+  <p class="stil">Definieer zelf rangen op basis van de permanente ELO, bv. <em>Zilver</em>
+     van 900 tot 1000. Spelers krijgen hun rang automatisch te zien in het klassement
+     en op hun profiel.</p>
+  <form method="post" action="{{ url_for('rang_nieuw') }}" class="rij-form">
+    <input type="text" name="naam" placeholder="Naam (bv. Zilver)" required>
+    <input type="number" name="min_elo" placeholder="Van (bv. 900)" step="1" required class="mini-input">
+    <input type="number" name="max_elo" placeholder="Tot (bv. 1000)" step="1" required class="mini-input">
+    <input type="color" name="kleur" value="#94a3b8" title="Kleur van de rang">
+    <button type="submit" class="knop primair">Rang toevoegen</button>
+  </form>
+  {% if rangen %}
+  <table class="tabel compact">
+    <thead><tr><th>Rang</th><th class="kol-num">Van</th><th class="kol-num">Tot</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rangen %}
+      <tr>
+        <td><span class="rang-pil" data-kleur="{{ r['color'] }}">{{ r['name'] }}</span></td>
+        <td class="kol-num">{{ r['min_elo']|elo }}</td>
+        <td class="kol-num">{{ r['max_elo']|elo }}</td>
+        <td class="kol-num">
+          <form method="post" action="{{ url_for('rang_verwijderen', rang_id=r['id']) }}"
+                data-confirm="Rang “{{ r['name'] }}” verwijderen?">
+            <button type="submit" class="knop gevaar klein">Verwijderen</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="stil klein-tekst">Bij overlappende rangen geldt de rang met de hoogste ondergrens.</p>
+  {% endif %}
+</div>
+
+<h2 class="sectiekop" id="statistieken">Statistieken</h2>
+<div class="kaart">
+  <p class="stil">Maak hier een nieuwe statistiek aan (bv. <em>saves</em>). Ze verschijnt
+     meteen op elk resultaatformulier en krijgt automatisch een eigen klassement op de
+     statistiekenpagina. Statistieken hebben geen invloed op de ELO-ratings.</p>
+  <form method="post" action="{{ url_for('stat_nieuw') }}" class="rij-form">
+    <input type="text" name="naam" placeholder="Naam (bv. saves)" required>
+    <input type="text" name="eenheid" placeholder="Eenheid (optioneel, bv. stuks)">
+    <button type="submit" class="knop primair">Statistiek toevoegen</button>
+  </form>
+  {% if types %}
+  <table class="tabel">
+    <thead><tr><th>Statistiek</th><th>Eenheid</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for st in types %}
+      <tr>
+        <td class="naam">{{ st['name'] }}</td>
+        <td>{{ st['unit'] or '—' }}</td>
+        <td>{% if st['active'] %}<span class="pil pil-actief">actief</span>{% else %}<span class="pil">gepauzeerd</span>{% endif %}</td>
+        <td class="kol-num">
+          <form method="post" action="{{ url_for('stat_toggle', stat_id=st['id']) }}">
+            <button type="submit" class="knop klein">{{ 'Pauzeren' if st['active'] else 'Activeren' }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+{% endblock %}

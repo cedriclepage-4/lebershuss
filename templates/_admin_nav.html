@@ -1,0 +1,17 @@
+<nav class="admin-nav">
+  {% set paginas = [
+    ('admin', 'Overzicht', '🏠'),
+    ('admin_seizoenen', 'Seizoenen', '🗓️'),
+    ('admin_wedstrijden', 'Wedstrijden', '🥅'),
+    ('admin_toernooien', 'Toernooien', '🥇'),
+    ('admin_spelers', 'Spelers &amp; teams', '👥'),
+    ('admin_klassement', 'Rangen &amp; statistieken', '📊'),
+    ('admin_instellingen', 'Instellingen', '⚙️'),
+  ] %}
+  {% set league_paginas = ['admin_seizoenen', 'admin_wedstrijden'] %}
+  {% for endpoint, label, icoon in paginas %}
+  <a href="{{ url_for(endpoint) }}"
+     class="{{ 'actief' if request.endpoint == endpoint }}{{ ' league-uit' if endpoint in league_paginas and not league_zichtbaar }}"
+     {% if endpoint in league_paginas and not league_zichtbaar %}title="Het leaguegedeelte staat uit: spelers zien dit niet."{% endif %}>{{ icoon }} {{ label|safe }}</a>
+  {% endfor %}
+</nav>

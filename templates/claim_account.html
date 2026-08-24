@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block titel %}{{ speler['name'] }} — wachtwoord kiezen{% endblock %}
+{% block inhoud %}
+
+<div class="login-wrap">
+  <div class="kaart login-kaart">
+    <p class="stil klein-tekst"><a href="{{ url_for('claimen') }}">← Toch iemand anders</a></p>
+
+    <div class="claim-kop">
+      <span class="claim-letter">{{ speler['name'][0]|upper }}</span>
+      <div>
+        <p class="stil klein-tekst">Je eist dit account op</p>
+        <h1 class="claim-naam">{{ speler['name'] }}</h1>
+      </div>
+    </div>
+
+    <form method="post">
+      <label>Kies een wachtwoord (min. 6 tekens)
+        <input type="password" name="wachtwoord" minlength="6"
+               autocomplete="new-password" autofocus required></label>
+      <label>Nog eens, voor de zekerheid
+        <input type="password" name="herhaal" minlength="6"
+               autocomplete="new-password" required></label>
+
+      <label>Bijnaam (optioneel)
+        <input type="text" name="bijnaam" maxlength="30" value="{{ speler['nickname'] }}"></label>
+      <p class="stil klein-tekst velduitleg">Zó verschijn je op de site. Laat je dit leeg,
+         dan tonen we je naam hierboven.</p>
+
+      <button type="submit" class="knop primair breed">Dit account is van mij</button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

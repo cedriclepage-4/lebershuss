@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block titel %}Seizoenen{% endblock %}
+{% block inhoud %}
+
+<section class="held">
+  <h1>Seizoenen</h1>
+  <p>De competitie wordt gespeeld in seizoenen met vaste speeldagen. Hier vind je
+     het lopende seizoen én de eregalerij van alle voorbije seizoenen.</p>
+</section>
+
+{% if lijst %}
+<div class="wedstrijd-lijst">
+  {% for item in lijst %}
+  <div class="kaart seizoen-kaart">
+    <div class="seizoen-kop">
+      <h3><a class="profiel-link" href="{{ url_for('seizoen_detail', seizoen_id=item.seizoen['id']) }}">{{ item.seizoen['name'] }}</a></h3>
+      <span class="pil {{ 'pil-actief' if item.status == 'bezig' }}">{{ item.status }}</span>
+    </div>
+    <div class="wedstrijd-meta">📅 {{ item.seizoen['start_date']|dag }} t.e.m. {{ item.seizoen['end_date']|dag }}
+      · {{ item.speeldagen }} speeldag{{ 'en' if item.speeldagen != 1 }}
+      · {{ item.gespeeld }} gespeelde wedstrijd{{ 'en' if item.gespeeld != 1 }}</div>
+    {% if item.topklimmer %}
+    <div class="seizoen-highlight">👑 Sterkste klim: <a class="profiel-link" href="{{ item.topklimmer.url }}">{{ item.topklimmer.naam }}</a> ({{ item.topklimmer.waarde }})</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="kaart leeg">Nog geen seizoenen. De organisatoren kunnen een seizoen aanmaken via het organisatiepaneel.</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,78 @@
+{# Palmares van een speler of team: eindplaats per seizoen en resultaat per toernooi.
+   Verwacht: seizoen_ratings, toernooien, titels.
+   Optioneel: toon_team (toon in welk team er gespeeld werd — enkel zinvol bij spelers). #}
+
+{% if seizoen_ratings and league_toegankelijk %}
+<h2 class="sectiekop">Seizoenen
+  {% if not league_zichtbaar %}<span class="pil pil-verborgen">niet zichtbaar voor spelers</span>{% endif %}</h2>
+<div class="kaart">
+  <p class="klein-tekst stil">Elk seizoen start op 1000 ELO en heeft zijn eigen klassement.
+     De plaats hieronder is die in het seizoensklassement.</p>
+  <table class="tabel compact">
+    <thead>
+      <tr><th>Seizoen</th><th>Plaats</th><th class="kol-num">G</th><th class="kol-num">W</th>
+          <th class="kol-num verbergen-mobiel">V</th><th class="kol-elo">ELO</th></tr>
+    </thead>
+    <tbody>
+      {% for s in seizoen_ratings %}
+      <tr>
+        <td class="naam wikkel">
+          <a class="profiel-link" href="{{ url_for('seizoen_detail', seizoen_id=s['id']) }}">{{ s['name'] }}</a>
+          {% if s['status'] == 'bezig' %}<span class="pil pil-actief">bezig</span>{% endif %}
+        </td>
+        <td>
+          <span class="plaats-pil {{ 'plaats-1' if s['plaats'] == 1 }}{{ 'plaats-2' if s['plaats'] == 2 }}{{ 'plaats-3' if s['plaats'] == 3 }}">
+            {%- if s['plaats'] == 1 %}🥇 {% elif s['plaats'] == 2 %}🥈 {% elif s['plaats'] == 3 %}🥉 {% endif -%}
+            {{ s['plaats'] }}<sup>e</sup></span>
+          <span class="stil klein-tekst">van {{ s['aantal'] }}</span>
+        </td>
+        <td class="kol-num">{{ s['gespeeld'] }}</td>
+        <td class="kol-num">{{ s['winst'] }}</td>
+        <td class="kol-num verbergen-mobiel">{{ s['verlies'] }}</td>
+        <td class="kol-elo"><span class="elo-badge">{{ s['elo']|elo }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if toernooien %}
+<h2 class="sectiekop">Toernooien</h2>
+<div class="kaart">
+  <p class="klein-tekst stil">
+     {%- if league_zichtbaar %}Toernooiwedstrijden tellen mee voor de permanente ELO,
+     niet voor een seizoensklassement.
+     {%- else %}Elke toernooiwedstrijd telt mee voor de permanente ELO.{% endif %}
+     {% if titels %}<strong>{{ titels }}× toernooiwinnaar.</strong>{% endif %}</p>
+  <table class="tabel compact">
+    <thead>
+      <tr><th>Toernooi</th>{% if toon_team %}<th class="verbergen-mobiel">Team</th>{% endif %}
+          <th>Resultaat</th><th class="kol-num">G</th><th class="kol-num">W</th></tr>
+    </thead>
+    <tbody>
+      {% for tn in toernooien %}
+      <tr>
+        <td class="naam wikkel">
+          <a class="profiel-link" href="{{ url_for('toernooi_detail', toernooi_id=tn.id) }}">{{ tn.naam }}</a>
+          <div class="klein-tekst stil">{{ tn.datum|dag }}</div>
+        </td>
+        {% if toon_team %}
+        <td class="stil wikkel verbergen-mobiel">
+          <a class="profiel-link" href="{{ url_for('team_profiel', team_id=tn.team_id) }}">{{ tn.team_naam }}</a>
+        </td>
+        {% endif %}
+        <td class="wikkel">
+          <span class="uitslag-pil {{ 'uitslag-' ~ tn.klasse if tn.klasse }}">{{ tn.label }}</span>
+          {% if tn.positie %}
+          <div class="klein-tekst stil">{{ tn.positie }}<sup>e</sup> van {{ tn.aantal }} in de bracketfase</div>
+          {% endif %}
+        </td>
+        <td class="kol-num">{{ tn.gespeeld }}</td>
+        <td class="kol-num">{{ tn.winst }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}

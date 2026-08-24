@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block titel %}Statistieken{% endblock %}
+{% block inhoud %}
+
+<section class="held">
+  <h1>Statistieken</h1>
+  <p>Naast de ELO-ratings houden we ook losse statistieken bij per wedstrijd.
+     Deze tellen niet mee voor het klassement — maar eeuwige roem is ook wat waard.</p>
+</section>
+
+{% if verdeling %}
+<h2 class="sectiekop">Rangverdeling</h2>
+<div class="kaart">
+  <p class="stil klein-tekst">Zo zijn de {{ verdeling|sum(attribute='aantal') }} actieve spelers
+     verdeeld over de rangen.</p>
+  <div class="verdeling">
+    {% for v in verdeling %}
+    <div class="verdeling-rij">
+      <span class="verdeling-label"><span class="rang-pil" data-kleur="{{ v.kleur }}">{{ v.naam }}</span></span>
+      <div class="verdeling-balk"><div class="verdeling-vul" data-pct="{{ v.pct|round(1) }}" data-kleur="{{ v.kleur }}"></div></div>
+      <span class="verdeling-aantal">{{ v.aantal }} speler{{ 's' if v.aantal != 1 }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<h2 class="sectiekop">Recordboek</h2>
+{% if records %}
+<div class="record-raster">
+  {% for r in records %}
+  <div class="kaart record-kaart">
+    <div class="record-emoji">{{ r.emoji }}</div>
+    <div class="record-titel">{{ r.titel }}</div>
+    <div class="record-waarde">{{ r.waarde }}</div>
+    <div class="record-houder">
+      {% for h in r.houders %}<a class="profiel-link" href="{{ h.url }}">{{ h.naam }}</a>{{ ", " if not loop.last }}{% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="kaart leeg">De records verschijnen hier zodra de eerste wedstrijd gespeeld is.</div>
+{% endif %}
+
+<h2 class="sectiekop">Extra statistieken</h2>
+{% if borden %}
+  {% for bord in borden %}
+  <h2 class="sectiekop">{{ bord.type['name'] }}{% if bord.type['unit'] %} <span class="stil">({{ bord.type['unit'] }})</span>{% endif %}</h2>
+  <div class="stat-raster">
+    <div class="kaart">
+      <h3>Totaal</h3>
+      {% if bord.totaal %}
+      <table class="tabel compact">
+        <thead><tr><th class="kol-rang">#</th><th>Speler</th><th class="kol-num">Totaal</th><th class="kol-num">Wedstrijden</th></tr></thead>
+        <tbody>
+          {% for r in bord.totaal %}
+          <tr>
+            <td class="kol-rang">{% if loop.index == 1 %}🥇{% else %}{{ loop.index }}{% endif %}</td>
+            <td class="naam"><a class="profiel-link" href="{{ url_for('speler_profiel', speler_id=r['speler_id']) }}">{{ r['naam'] }}</a></td>
+            <td class="kol-num"><strong>{{ r['totaal']|round(1) }}</strong></td>
+            <td class="kol-num">{{ r['n'] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="stil">Nog geen gegevens ingevuld voor deze statistiek.</p>{% endif %}
+    </div>
+    <div class="kaart">
+      <h3>Gemiddeld per wedstrijd</h3>
+      {% if bord.gemiddeld %}
+      <table class="tabel compact">
+        <thead><tr><th class="kol-rang">#</th><th>Speler</th><th class="kol-num">Gemiddelde</th><th class="kol-num">Wedstrijden</th></tr></thead>
+        <tbody>
+          {% for r in bord.gemiddeld %}
+          <tr>
+            <td class="kol-rang">{% if loop.index == 1 %}🥇{% else %}{{ loop.index }}{% endif %}</td>
+            <td class="naam"><a class="profiel-link" href="{{ url_for('speler_profiel', speler_id=r['speler_id']) }}">{{ r['naam'] }}</a></td>
+            <td class="kol-num"><strong>{{ (r['totaal'] / r['n'])|round(2) }}</strong></td>
+            <td class="kol-num">{{ r['n'] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="stil">Nog geen gegevens ingevuld voor deze statistiek.</p>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="kaart leeg">
+    <h3>Nog geen statistieken</h3>
+    <p>De organisatoren hebben nog geen statistieken aangemaakt. Zodra er eentje
+       bestaat (bijvoorbeeld <em>saves</em>), kan ze bij elke wedstrijd ingevuld
+       worden en verschijnen hier automatisch de klassementen: totalen én
+       gemiddelden per wedstrijd.</p>
+  </div>
+{% endif %}
+
+{% endblock %}

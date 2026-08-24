@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block titel %}{{ speler['naam'] }}{% endblock %}
+{% block inhoud %}
+
+<section class="held profiel-kop">
+  <div class="profiel-rij">
+    {% if speler['avatar'] %}<img class="avatar-groot" src="{{ url_for('media', bestand=speler['avatar']) }}" alt="">
+    {% else %}<span class="avatar-groot avatar-fallback">{{ speler['naam'][0]|upper }}</span>{% endif %}
+    <div>
+      <h1>{{ speler['naam'] }}
+        {% if rang %}<span class="rang-pil groot" data-kleur="{{ rang['color'] }}">{{ rang['name'] }}</span>{% endif %}
+        {% if not speler['active'] %}<span class="pil">inactief</span>{% endif %}
+      </h1>
+      <p><span class="speler-id" title="Spelersnummer — handig om elkaar terug te vinden">#{{ speler['id'] }}</span>
+         {% if speler['nickname'] %}Accountnaam: {{ speler['name'] }} · {% endif %}{% if is_eigen %}Dit is jouw profiel. {% endif %}Lid sinds {{ speler['created_at']|datum }}.</p>
+    </div>
+  </div>
+  <div class="held-cijfers">
+    <div class="cijfer"><strong>{{ speler['elo']|elo }}</strong><span>permanente ELO</span></div>
+    <div class="cijfer"><strong>{{ stats['gespeeld'] }}</strong><span>gespeeld</span></div>
+    <div class="cijfer"><strong>{{ stats['winst'] }}</strong><span>gewonnen</span></div>
+    <div class="cijfer"><strong>{{ verlies }}</strong><span>verloren</span></div>
+    {% if pct is not none %}<div class="cijfer"><strong>{{ pct|round|int }}%</strong><span>winstpercentage</span></div>{% endif %}
+    {% if toernooi_stats.gespeeld %}
+    <div class="cijfer"><strong>{{ toernooi_stats.winst }}/{{ toernooi_stats.gespeeld }}</strong><span>toernooiwedstrijden</span></div>
+    {% endif %}
+  </div>
+</section>
+
+{% with toon_team = true %}{% include "_palmares.html" %}{% endwith %}
+
+{% if is_eigen and uitnodigingen %}
+<h2 class="sectiekop">Teamuitnodigingen</h2>
+<div class="wedstrijd-lijst">
+  {% for u in uitnodigingen %}
+  <div class="kaart">
+    <div class="wedstrijd-teams"><span class="team-naam">{{ u.naam }}</span></div>
+    <div class="wedstrijd-meta">✉️ {{ u.partner }} wil met jou een team vormen{% if u.beschrijving %} — “{{ u.beschrijving }}”{% endif %}</div>
+    <div class="actie-rij ruimte-boven">
+      <form method="post" action="{{ url_for('team_antwoord', team_id=u.id) }}" class="inline-form">
+        <input type="hidden" name="actie" value="accepteren">
+        <button type="submit" class="knop primair klein">Aanvaarden</button>
+      </form>
+      <form method="post" action="{{ url_for('team_antwoord', team_id=u.id) }}" class="inline-form"
+            data-confirm="Uitnodiging voor “{{ u.naam }}” weigeren?">
+        <input type="hidden" name="actie" value="weigeren">
+        <button type="submit" class="knop gevaar klein">Weigeren</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if is_eigen and meldingen %}
+<h2 class="sectiekop">Jouw geplande wedstrijden</h2>
+<p class="stil klein-tekst">Meld hier de uitslag na afloop. Zodra iemand van elk team
+   dezelfde winnaar meldt, wordt het resultaat officieel en worden de ELO-ratings
+   bijgewerkt.</p>
+<div class="wedstrijd-lijst">
+  {% for m in meldingen %}
+    {% include "_meld_kaart.html" %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if punten|length >= 2 %}
+<h2 class="sectiekop">ELO-verloop</h2>
+<div class="kaart">
+  <div id="elo-grafiek" class="elo-grafiek"></div>
+  <p class="stil klein-tekst">Beweeg over de lijn om per wedstrijd de rating én de plaats
+     in het klassement op dat moment te zien.</p>
+</div>
+<script>window.ELO_PUNTEN = {{ punten|tojson }};</script>
+{% endif %}
+
+{% if eigen_stats %}
+<h2 class="sectiekop">Persoonlijke statistieken</h2>
+<div class="kaart">
+  <table class="tabel compact">
+    <thead><tr><th>Statistiek</th><th class="kol-num">Totaal</th><th class="kol-num">Gemiddeld per wedstrijd</th><th class="kol-num">Wedstrijden</th></tr></thead>
+    <tbody>
+      {% for st in eigen_stats %}
+      <tr>
+        <td class="naam">{{ st['name'] }}{% if st['unit'] %} <span class="stil">({{ st['unit'] }})</span>{% endif %}</td>
+        <td class="kol-num"><strong>{{ st['totaal']|round(1) }}</strong></td>
+        <td class="kol-num">{{ (st['totaal'] / st['n'])|round(2) }}</td>
+        <td class="kol-num">{{ st['n'] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<h2 class="sectiekop">Teams</h2>
+{% if teams %}
+<div class="kaart">
+  <table class="tabel compact">
+    <thead><tr><th>Team</th><th>Met</th><th class="kol-elo">ELO</th><th class="kol-num">Gespeeld</th><th class="kol-num">Gewonnen</th></tr></thead>
+    <tbody>
+      {% for t in teams %}
+      <tr>
+        <td class="naam"><a class="profiel-link met-avatar" href="{{ url_for('team_profiel', team_id=t.id) }}">
+          {%- if t.avatar %}<img class="avatar-mini" src="{{ url_for('media', bestand=t.avatar) }}" alt="">{% else %}<span class="avatar-mini avatar-fallback">{{ t.naam[0]|upper }}</span>{% endif %} {{ t.naam }}</a></td>
+        <td><a class="profiel-link" href="{{ url_for('speler_profiel', speler_id=t.partner_id) }}">{{ t.partner }}</a></td>
+        <td class="kol-elo"><span class="elo-badge">{{ t.elo|elo }}</span></td>
+        <td class="kol-num">{{ t.gespeeld }}</td>
+        <td class="kol-num">{{ t.winst }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="kaart leeg">{% if is_eigen %}Je zit nog in geen enkel team.{% else %}Deze speler zit nog in geen enkel actief team.{% endif %}</div>
+{% endif %}
+
+{% if is_eigen %}
+{% if verstuurd %}
+<div class="kaart">
+  <h3>Wachten op antwoord</h3>
+  {% for v in verstuurd %}
+  <p class="stil">⏳ “{{ v.naam }}” — uitnodiging verstuurd naar {{ v.partner }}.</p>
+  {% endfor %}
+</div>
+{% endif %}
+<div class="kaart">
+  <h3>Nieuw team maken</h3>
+  <p class="stil klein-tekst">Kies een teamgenoot en verzin een naam. Je teamgenoot moet de
+     uitnodiging eerst aanvaarden voor jullie kunnen spelen. Je kan in meerdere teams zitten.</p>
+  {% if partners %}
+  <form method="post" action="{{ url_for('team_nieuw') }}">
+    <label>Teamgenoot zoeken op naam of spelersnummer
+      <input type="search" id="partner-zoek" data-filter-doel="#partner-keuze"
+             placeholder="Bv. “jef” of “12”" autocomplete="off">
+    </label>
+    <select name="partner" id="partner-keuze" required
+            {% if partners|length > 6 %}size="8"{% endif %} class="partner-keuze">
+      <option value="" disabled selected>Kies je teamgenoot…</option>
+      {% for pt in partners %}
+      <option value="{{ pt['id'] }}" data-term="{{ pt['naam'] }} {{ pt['id'] }}">
+        #{{ pt['id'] }} · {{ pt['naam'] }}</option>
+      {% endfor %}
+    </select>
+    <p class="stil klein-tekst" id="partner-teller"></p>
+    <div class="rij-form">
+      <input type="text" name="naam" placeholder="Teamnaam" maxlength="40" required>
+    </div>
+    <label>Beschrijving (optioneel)
+      <input type="text" name="beschrijving" maxlength="200" placeholder="Bv. de onklopbare kelderkampioenen"></label>
+    <button type="submit" class="knop primair">Uitnodiging versturen</button>
+  </form>
+  {% else %}
+  <p class="stil">Er zijn nog geen andere spelers om mee te teamen.</p>
+  {% endif %}
+</div>
+<div class="kaart">
+  <h3>Profielinstellingen</h3>
+  <form method="post" action="{{ url_for('profiel_instellingen') }}" enctype="multipart/form-data">
+    <label>Je naam
+      <input type="text" value="{{ speler['name'] }}" disabled></label>
+    <p class="stil klein-tekst velduitleg">🔒 Je echte naam hoort bij je account en ligt vast —
+       daarmee log je ook in. Klopt er iets niet? Vraag het aan een organisator.</p>
+    <label>Bijnaam (zo verschijn je overal op de site; leeg = je echte naam)
+      <input type="text" name="bijnaam" maxlength="30" value="{{ speler['nickname'] }}"></label>
+    <label>Profielfoto (png, jpg, webp of gif — max. 3 MB)
+      <input type="file" name="avatar" accept=".png,.jpg,.jpeg,.webp,.gif"></label>
+    <button type="submit" class="knop primair">Opslaan</button>
+  </form>
+</div>
+<div class="kaart">
+  <h3>Wachtwoord wijzigen</h3>
+  <form method="post" action="{{ url_for('wachtwoord_wijzigen') }}">
+    <label>Huidig wachtwoord
+      <input type="password" name="huidig" autocomplete="current-password" required></label>
+    <label>Nieuw wachtwoord (min. 6 tekens)
+      <input type="password" name="nieuw" minlength="6" autocomplete="new-password" required></label>
+    <button type="submit" class="knop primair">Wachtwoord wijzigen</button>
+  </form>
+</div>
+{% endif %}
+
+<h2 class="sectiekop">Wedstrijdhistoriek</h2>
+{% if historiek %}
+<div class="kaart">
+  <table class="tabel compact">
+    <thead><tr><th>Datum</th><th>Soort</th><th>Met</th><th>Tegen</th><th>Resultaat</th><th class="kol-num">ELO</th></tr></thead>
+    <tbody>
+      {% for h in historiek %}
+      <tr>
+        <td>{{ h.game['played_at']|datum }}</td>
+        <td>{% if h.game['tournament_id'] %}<span class="pil pil-toernooi">{{ h.game|fase }}</span>{% else %}<span class="pil">league</span>{% endif %}</td>
+        <td class="naam"><a class="profiel-link" href="{{ url_for('team_profiel', team_id=h.eigen_team) }}">{{ namen[h.eigen_team] }}</a></td>
+        <td class="naam"><a class="profiel-link" href="{{ url_for('team_profiel', team_id=h.tegen_team) }}">{{ namen[h.tegen_team] }}</a></td>
+        <td>{% if h.gewonnen %}<span class="pil pil-actief">gewonnen</span>{% else %}<span class="pil pil-rood">verloren</span>{% endif %}</td>
+        <td class="kol-num">
+          {% if h.delta is not none %}
+            <span class="delta {{ 'plus' if h.delta >= 0 else 'min' }}">{{ '+' if h.delta >= 0 }}{{ h.delta|round|int }}</span>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="kaart leeg">Nog geen wedstrijden gespeeld.</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block titel %}Wedstrijden beheren{% endblock %}
+{% block inhoud %}
+
+<section class="held">
+  <h1>Leaguewedstrijden</h1>
+  <p>Plan wedstrijden, vul resultaten in en zet fouten recht. Toernooiwedstrijden
+     beheer je bij het toernooi zelf.</p>
+</section>
+
+{% include "_admin_nav.html" %}
+
+{% if not league_zichtbaar %}
+<div class="kaart aandacht-kaart">
+  <p class="klein-tekst">🙈 Het leaguegedeelte staat uit: <strong>spelers zien deze
+     wedstrijden niet</strong> en kunnen ze ook niet melden. Zet het aan bij
+     <a class="profiel-link" href="{{ url_for('admin_instellingen') }}#league">Instellingen</a>
+     wanneer je de league wil openstellen.</p>
+</div>
+{% endif %}
+
+<nav class="anker-nav">
+  <a href="#plannen">Plannen</a>
+  <a href="#openstaand">Openstaand ({{ gepland|length }})</a>
+  <a href="#gespeeld">Recent gespeeld</a>
+</nav>
+
+<!-- ============================================================ plannen -->
+<h2 class="sectiekop" id="plannen">Wedstrijd plannen</h2>
+<div class="kaart">
+  {% if not speeldag_opties %}
+  <p class="stil">Maak eerst een seizoen met minstens één speeldag aan bij
+     <a class="profiel-link" href="{{ url_for('admin_seizoenen') }}">Seizoenen</a>,
+     dan kan je wedstrijden plannen.</p>
+  {% elif teams|length < 2 %}
+  <p class="stil">Er zijn minstens 2 actieve teams nodig. Spelers maken zelf teams
+     aan via hun profiel (met een uitnodiging aan hun teamgenoot).</p>
+  {% else %}
+  <form method="post" action="{{ url_for('wedstrijd_nieuw') }}" class="plan-form">
+    <div class="plan-raster">
+      <fieldset>
+        <legend>Team 1</legend>
+        <select name="team1" required>
+          <option value="" disabled selected>Kies een team…</option>
+          {% for t in teams %}<option value="{{ t.id }}">{{ t.naam }} ({{ t.leden }})</option>{% endfor %}
+        </select>
+      </fieldset>
+      <div class="plan-vs">vs</div>
+      <fieldset>
+        <legend>Team 2</legend>
+        <select name="team2" required>
+          <option value="" disabled selected>Kies een team…</option>
+          {% for t in teams %}<option value="{{ t.id }}">{{ t.naam }} ({{ t.leden }})</option>{% endfor %}
+        </select>
+      </fieldset>
+    </div>
+    <div class="plan-onder">
+      <label>Speeldag
+        <select name="speeldag" required>
+          <option value="" disabled selected>Kies een speeldag…</option>
+          {% for sd in speeldag_opties %}<option value="{{ sd['id'] }}">{{ sd['title'] }} · {{ sd['seizoen'] }} ({{ sd['date']|dag }})</option>{% endfor %}
+        </select>
+      </label>
+      <label>Aanvangsuur
+        <input type="datetime-local" name="moment" value="{{ nu }}">
+      </label>
+      <button type="submit" class="knop primair">Inplannen</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+<!-- ========================================================= openstaand -->
+<h2 class="sectiekop" id="openstaand">Openstaande wedstrijden</h2>
+<p class="stil klein-tekst">Spelers melden normaal zelf de uitslag via hun profiel;
+   pas als beide teams dezelfde winnaar melden, wordt die officieel. Hieronder zelf
+   invullen is de reserve-optie, bv. om een conflict te beslechten.</p>
+{% if gepland %}
+<div class="wedstrijd-lijst">
+  {% for g in gepland %}
+  <div class="kaart">
+    <div class="wedstrijd-teams">
+      <span class="team-naam">{{ namen[g['team1_id']] }}</span>
+      <span class="vs">vs</span>
+      <span class="team-naam">{{ namen[g['team2_id']] }}</span>
+    </div>
+    <div class="wedstrijd-meta">📅 {{ g['scheduled_at']|datum }}</div>
+    {% if meldingen_per_game.get(g['id']) %}
+    <div class="meld-status">
+      {% for m in meldingen_per_game[g['id']] %}
+      <span class="pil pil-actief">📣 {{ namen[m['team_id']] }} (via {{ m['speler_naam'] }}): winnaar {{ namen[m['winner_team_id']] }}</span>
+      {% endfor %}
+    </div>
+    {% set ms = meldingen_per_game[g['id']] %}
+    {% if ms|length == 2 and ms[0]['winner_team_id'] != ms[1]['winner_team_id'] %}
+    <p class="conflict-tekst">⚠️ De meldingen spreken elkaar tegen — vul hieronder zelf
+       de juiste uitslag in om het conflict te beslechten.</p>
+    {% endif %}
+    {% endif %}
+
+    <form method="post" action="{{ url_for('wedstrijd_resultaat', game_id=g['id']) }}" class="resultaat-form">
+      <div class="resultaat-rij"><span class="veld-label">Winnaar:</span></div>
+      <div class="keuze-groep">
+        <label class="radio"><input type="radio" name="winnaar" value="1" required> {{ namen[g['team1_id']] }}</label>
+        <label class="radio"><input type="radio" name="winnaar" value="2"> {{ namen[g['team2_id']] }}</label>
+      </div>
+      <div class="resultaat-rij">
+        <label>Gespeeld op <input type="datetime-local" name="gespeeld_op" value="{{ nu }}"></label>
+      </div>
+
+      {% if actieve_types %}
+      <details class="stats-invul">
+        <summary>Statistieken invullen (optioneel)</summary>
+        <table class="tabel compact">
+          <thead>
+            <tr><th>Speler</th>
+            {% for st in actieve_types %}<th class="kol-num">{{ st['name'] }}{% if st['unit'] %} ({{ st['unit'] }}){% endif %}</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for sp in team_spelers[g['team1_id']] + team_spelers[g['team2_id']] %}
+            <tr>
+              <td class="naam">{{ sp['name'] }}</td>
+              {% for st in actieve_types %}
+              <td class="kol-num"><input type="number" step="any" min="0" class="stat-input"
+                     name="stat_{{ st['id'] }}_{{ sp['id'] }}" placeholder="—"></td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </details>
+      {% endif %}
+
+      <div class="resultaat-acties">
+        <button type="submit" class="knop primair">Resultaat opslaan</button>
+      </div>
+    </form>
+    <form method="post" action="{{ url_for('wedstrijd_verwijderen', game_id=g['id']) }}"
+          data-confirm="Deze geplande wedstrijd verwijderen?">
+      <button type="submit" class="knop gevaar klein">Verwijderen</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="kaart leeg">Geen openstaande wedstrijden. Plan er hierboven eentje in!</div>
+{% endif %}
+
+<!-- =========================================================== gespeeld -->
+<h2 class="sectiekop" id="gespeeld">Recent gespeeld</h2>
+{% if recent %}
+<div class="kaart">
+  <table class="tabel">
+    <thead><tr><th>Wedstrijd</th><th>Winnaar</th><th>Gespeeld op</th><th></th></tr></thead>
+    <tbody>
+      {% for g in recent %}
+      <tr>
+        <td class="naam">{{ namen[g['team1_id']] }} <span class="vs-klein">vs</span> {{ namen[g['team2_id']] }}</td>
+        <td>🏆 {{ namen[g['winner_team_id']] }}</td>
+        <td>{{ g['played_at']|datum }}</td>
+        <td class="kol-num">
+          <form method="post" action="{{ url_for('wedstrijd_verwijderen', game_id=g['id']) }}"
+                data-confirm="Dit resultaat verwijderen? Alle ratings worden dan herberekend.">
+            <button type="submit" class="knop gevaar klein">Verwijderen</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="stil klein-tekst">Foutje gemaakt? Verwijder het resultaat en plan de wedstrijd opnieuw in —
+     alle ratings worden automatisch correct herberekend.</p>
+</div>
+{% else %}
+<div class="kaart leeg">Nog geen gespeelde wedstrijden.</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>{% block titel %}Lebershuss Tonzent{% endblock %} · Lebershuss Tonzent</title>
+  <link rel="stylesheet" href="{{ url_for('statisch', bestand='style.css') }}">
+  <link rel="icon" href="{{ url_for('statisch', bestand=logo_bestand) }}">
+  {# installeerbaar als app op de gsm #}
+  <link rel="manifest" href="{{ url_for('manifest') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('statisch', bestand='apple-touch-icon.png') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Lebershuss">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="logo" href="{{ url_for('index') if league_toegankelijk else url_for('toernooien') }}">
+        <img class="logo-beeld" src="{{ url_for('statisch', bestand=logo_bestand) }}" alt="Lebershuss Tonzent logo">
+        <span>
+          <strong>Lebershuss <span class="merk-org">Tonzent</span></strong>
+          <small>league &amp; toernooien van jeugdhuis Tonzent</small>
+        </span>
+      </a>
+      <nav class="nav">
+        {% if session.get('speler_id') %}
+          <a href="{{ url_for('speler_profiel', speler_id=session['speler_id']) }}"
+             class="{{ 'actief' if request.path == '/speler/' ~ session['speler_id'] }}">Mijn profiel</a>
+          <a href="{{ url_for('uitloggen') }}" class="nav-uit">Uitloggen</a>
+        {% else %}
+          <a href="{{ url_for('inloggen') }}" class="{{ 'actief' if request.path.startswith('/inloggen') or request.path.startswith('/registreren') }}">Inloggen</a>
+        {% endif %}
+        {% if is_organisator %}
+          <a href="{{ url_for('admin') }}" class="nav-admin {{ 'actief' if request.path.startswith('/admin') }}">Organisatie</a>
+        {% endif %}
+      </nav>
+    </div>
+
+    <div class="sectiebalk">
+      <div class="wrap sectie-inner">
+        {# Zonder leaguegedeelte is er niets te kiezen: dan tonen we die balk niet. #}
+        {% if league_toegankelijk %}
+        <div class="sectie-keuze">
+          <a class="sectie-knop {{ 'actief' if sectie == 'liga' }}" href="{{ url_for('index') }}">
+            <span class="sectie-icoon">🏆</span> League
+            {% if not league_zichtbaar %}<span class="pil pil-verborgen">verborgen</span>{% endif %}
+          </a>
+          <a class="sectie-knop {{ 'actief' if sectie == 'toernooi' }}" href="{{ url_for('toernooien') }}">
+            <span class="sectie-icoon">🥇</span> Toernooi
+          </a>
+        </div>
+        {% endif %}
+        <nav class="subnav">
+          {% if sectie == 'liga' %}
+            <a href="{{ url_for('index') }}" class="{{ 'actief' if request.path == '/' }}">Klassement</a>
+            <a href="{{ url_for('wedstrijden') }}" class="{{ 'actief' if request.path.startswith('/wedstrijden') }}">Wedstrijden</a>
+            <a href="{{ url_for('statistieken') }}" class="{{ 'actief' if request.path.startswith('/statistieken') }}">Statistieken</a>
+            <a href="{{ url_for('seizoenen') }}" class="{{ 'actief' if request.path.startswith('/seizoen') }}">Seizoenen</a>
+          {% else %}
+            <a href="{{ url_for('toernooien') }}" class="{{ 'actief' if request.path == '/toernooien' }}">Alle toernooien</a>
+            {% if huidig_toernooi is defined and huidig_toernooi %}
+              <a href="{{ url_for('toernooi_detail', toernooi_id=huidig_toernooi['id']) }}"
+                 class="{{ 'actief' if request.path.startswith('/toernooi/' ~ huidig_toernooi['id']) }}">{{ huidig_toernooi['name'] }}</a>
+            {% endif %}
+          {% endif %}
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    {% with berichten = get_flashed_messages(with_categories=true) %}
+      {% if berichten %}
+        <div class="flashes">
+          {% for soort, tekst in berichten %}
+            <div class="flash flash-{{ soort }}">{{ tekst }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block inhoud %}{% endblock %}
+  </main>
+
+  <footer class="voet">
+    <div class="wrap">
+      Lebershuss Tonzent · gemaakt met veel liefde in het gezelligste jeugdhuis van België
+      {% if not is_organisator %}
+        <a class="voet-organisatie" href="{{ url_for('admin') }}">⚙ Organisatie</a>
+      {% endif %}
+    </div>
+  </footer>
+
+  <script src="{{ url_for('statisch', bestand='app.js') }}"></script>
+  <script>
+    /* Zo kan de site als app op het startscherm gezet worden. Browsers doen dit
+       enkel op https of localhost; elders mislukt het stilletjes en verandert er
+       niets aan de gewone werking. */
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("{{ url_for('service_worker') }}")
+          .catch(function () {});
+      });
+    }
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

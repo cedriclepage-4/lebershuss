@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block titel %}Instellingen{% endblock %}
+{% block inhoud %}
+
+<section class="held">
+  <h1>Instellingen</h1>
+  <p>De knoppen die je zelden nodig hebt: welke delen van de site openstaan,
+     ELO-parameters en het volledig herberekenen van alle ratings.</p>
+</section>
+
+{% include "_admin_nav.html" %}
+
+<h2 class="sectiekop" id="league">Wat zien de spelers?</h2>
+<div class="kaart">
+  <p class="stil klein-tekst">De site bestaat uit twee delen. Je kan het
+     leaguegedeelte — klassement, wedstrijden, statistieken en seizoenen —
+     volledig verbergen en enkel met toernooien werken. Jij als organisator
+     blijft alles zien, ook wanneer het uit staat, zodat je in alle rust kan
+     klaarzetten. Aanzetten kan later met datzelfde vinkje: er gaat niets
+     verloren.</p>
+  <form method="post" action="{{ url_for('league_schakelen') }}">
+    <label class="schakel">
+      <input type="checkbox" name="league_actief" value="1" {{ 'checked' if league_zichtbaar }}>
+      <span>Leaguegedeelte tonen aan de spelers</span>
+    </label>
+    <p class="stil klein-tekst">
+      {%- if league_zichtbaar %}Nu: spelers zien <strong>League én Toernooi</strong>.
+      {%- else %}Nu: spelers zien <strong>enkel Toernooi</strong>. De startpagina is de
+      toernooipagina; het klassement, de wedstrijden, de statistieken en de seizoenen
+      zijn voor hen onbereikbaar.{% endif %}</p>
+    <button type="submit" class="knop primair">Opslaan</button>
+  </form>
+</div>
+
+<h2 class="sectiekop" id="backup">Back-up</h2>
+<div class="kaart">
+  <p class="stil klein-tekst">De volledige competitie — spelers, teams, wedstrijden,
+     toernooien en alle ratings — zit in één bestand. <strong>Download er af en toe
+     eentje</strong>, zeker vlak vóór en vlak ná een toernooi: dan kan je altijd
+     terug, ook als de server ermee ophoudt. Er wordt ook automatisch een kopie
+     gemaakt telkens de site opstart.</p>
+  <p class="rij-form">
+    <a class="knop primair" href="{{ url_for('backup_download') }}">⬇️ Download een back-up</a>
+    <form method="post" action="{{ url_for('backup_nu') }}">
+      <button type="submit" class="knop">Bewaar er nu eentje op de server</button>
+    </form>
+  </p>
+  {% if backups %}
+  <table class="tabel compact">
+    <thead><tr><th>Bestand</th><th>Gemaakt op</th><th class="kol-num">Grootte</th></tr></thead>
+    <tbody>
+      {% for b in backups %}
+      <tr>
+        <td class="naam stil">{{ b.naam }}</td>
+        <td>{{ b.moment.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td class="kol-num stil">{{ (b.grootte / 1024)|round|int }} kB</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="stil klein-tekst">Ze staan in <code>{{ backup_map }}</code>. Enkel de
+     20 nieuwste worden bewaard. Terugzetten doe je door zo'n bestand te hernoemen
+     naar <code>shuss.db</code> en de site te herstarten.</p>
+  {% else %}
+  <p class="stil klein-tekst">Er staan nog geen back-ups op de server.</p>
+  {% endif %}
+</div>
+
+<h2 class="sectiekop" id="adres">Adres van de site</h2>
+<div class="kaart">
+  <p class="stil klein-tekst">Voor QR-codes en links naar buiten toe moet de site weten
+     op welk adres bezoekers haar bereiken. Normaal leidt ze dat gewoon af uit het
+     adres waarmee jij ze opent — je hoeft hier dus <strong>niets</strong> in te vullen.
+     Enkel wanneer die twee verschillen is dit nodig: bijvoorbeeld als jij via
+     <code>{{ gezien_adres }}</code> werkt terwijl de spelers een domeinnaam gebruiken.</p>
+  <form method="post" action="{{ url_for('basisadres_opslaan') }}" class="rij-form">
+    <input type="url" name="basisadres" value="{{ basisadres }}"
+           placeholder="https://lebershuss.tonzent.be (leeg = automatisch)">
+    <button type="submit" class="knop primair">Opslaan</button>
+  </form>
+  <p class="stil klein-tekst">Nu in gebruik: <code>{{ basisadres or gezien_adres }}</code>
+     {% if not basisadres %}(automatisch){% endif %}</p>
+</div>
+
+<h2 class="sectiekop">Rekenwerk</h2>
+
+<div class="stat-raster">
+  <div class="kaart">
+    <h3>ELO-parameters</h3>
+    <p class="stil klein-tekst">De K-factor bepaalt hoe hard één wedstrijd doorweegt.
+       Toernooiwedstrijden krijgen automatisch een lager of hoger gewicht naargelang
+       de fase (bracket ×0,75 tot finale ×2).</p>
+    <form method="post" action="{{ url_for('instellingen_opslaan') }}"
+          data-confirm="K-factoren wijzigen? Alle ratings worden herberekend.">
+      <label>K-factor spelers
+        <input type="number" name="k_speler" value="{{ k_speler }}" min="1" max="200" step="1">
+      </label>
+      <label>K-factor teams
+        <input type="number" name="k_team" value="{{ k_team }}" min="1" max="200" step="1">
+      </label>
+      <button type="submit" class="knop primair">Opslaan &amp; herberekenen</button>
+    </form>
+  </div>
+
+  <div class="kaart">
+    <h3>Toegang tot het organisatiepaneel</h3>
+    <p class="stil klein-tekst">Er is geen algemeen adminwachtwoord meer: je bent
+       organisator omdat jouw eigen account die rol heeft. Wie mee mag organiseren,
+       duid je aan bij
+       <a class="profiel-link" href="{{ url_for('admin_spelers') }}#organisatoren">Spelers &amp; teams</a>.</p>
+    <p class="stil klein-tekst">Je eigen wachtwoord wijzig je op
+       <a class="profiel-link" href="{{ url_for('speler_profiel', speler_id=ik['id']) }}">je profiel</a>.</p>
+  </div>
+</div>
+
+<div class="kaart">
+  <h3>Alles herberekenen</h3>
+  <p class="stil klein-tekst">Speelt elke gespeelde wedstrijd chronologisch opnieuw af en
+     berekent zo de permanente ELO, alle seizoens-ELO's en de toernooistanden opnieuw.
+     Handig als er iets niet lijkt te kloppen — je kan er niets mee stukmaken.</p>
+  <form method="post" action="{{ url_for('herberekenen') }}">
+    <button type="submit" class="knop">🔄 Alle ratings herberekenen</button>
+  </form>
+</div>
+
+{% endblock %}

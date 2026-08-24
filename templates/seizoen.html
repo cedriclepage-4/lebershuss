@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block titel %}{{ seizoen['name'] }}{% endblock %}
+{% block inhoud %}
+
+<section class="held">
+  <h1>{{ seizoen['name'] }} <span class="pil {{ 'pil-actief' if status == 'bezig' }}">{{ status }}</span></h1>
+  <p>📅 {{ seizoen['start_date']|dag }} t.e.m. {{ seizoen['end_date']|dag }}</p>
+  <p class="klein-tekst stil">Dit klassement staat los van de permanente ELO: bij de start van
+     elk seizoen begint iedereen opnieuw op 1000. Enkel leaguewedstrijden van dit seizoen tellen mee.</p>
+</section>
+
+<h2 class="sectiekop">Seizoensklassement</h2>
+{% if sp_klassement or tm_klassement %}
+<div class="tabs" data-tabs>
+  <button class="tab actief" data-tab="spelers">Spelers</button>
+  <button class="tab" data-tab="teams">Teams</button>
+</div>
+<div class="paneel" data-paneel="spelers">
+  <div class="kaart">
+    <table class="tabel">
+      <thead><tr><th class="kol-rang">#</th><th>Speler</th><th class="kol-num">G</th><th class="kol-num">W</th><th class="kol-elo">Seizoens-ELO</th></tr></thead>
+      <tbody>
+        {% for r in sp_klassement %}
+        <tr>
+          <td class="kol-rang">{{ loop.index }}</td>
+          <td class="naam"><a class="profiel-link" href="{{ url_for('speler_profiel', speler_id=r['pid']) }}">{{ r['naam'] }}</a></td>
+          <td class="kol-num">{{ r['gespeeld'] }}</td>
+          <td class="kol-num">{{ r['winst'] }}</td>
+          <td class="kol-elo"><span class="elo-badge">{{ r['elo']|elo }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="paneel verborgen" data-paneel="teams">
+  <div class="kaart">
+    <table class="tabel">
+      <thead><tr><th class="kol-rang">#</th><th>Team</th><th class="kol-num">G</th><th class="kol-num">W</th><th class="kol-elo">Seizoens-ELO</th></tr></thead>
+      <tbody>
+        {% for r in tm_klassement %}
+        <tr>
+          <td class="kol-rang">{{ loop.index }}</td>
+          <td class="naam"><a class="profiel-link" href="{{ url_for('team_profiel', team_id=r['tid']) }}">{{ r['naam'] }}</a></td>
+          <td class="kol-num">{{ r['gespeeld'] }}</td>
+          <td class="kol-num">{{ r['winst'] }}</td>
+          <td class="kol-elo"><span class="elo-badge">{{ r['elo']|elo }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="kaart leeg">Er is in dit seizoen nog geen enkele wedstrijd gespeeld.</div>
+{% endif %}
+
+{% if stats %}
+<h2 class="sectiekop">Eregalerij van dit seizoen</h2>
+<div class="stat-raster">
+  <div class="kaart">
+    <h3>🏆 Meeste overwinningen (spelers)</h3>
+    <ol class="ere-lijst">
+      {% for r in stats.spelers_winst %}<li><a class="profiel-link" href="{{ r.url }}">{{ r.naam }}</a> — {{ r.waarde }}</li>{% endfor %}
+    </ol>
+  </div>
+  <div class="kaart">
+    <h3>📈 Grootste ELO-klim (spelers)</h3>
+    <ol class="ere-lijst">
+      {% for r in stats.spelers_klim %}<li><a class="profiel-link" href="{{ r.url }}">{{ r.naam }}</a> — {{ r.waarde }}</li>{% endfor %}
+    </ol>
+  </div>
+  <div class="kaart">
+    <h3>🏆 Beste teams</h3>
+    <ol class="ere-lijst">
+      {% for r in stats.teams_winst %}<li><a class="profiel-link" href="{{ r.url }}">{{ r.naam }}</a> — {{ r.waarde }}</li>{% endfor %}
+    </ol>
+  </div>
+  <div class="kaart">
+    <h3>📈 Grootste ELO-klim (teams)</h3>
+    <ol class="ere-lijst">
+      {% for r in stats.teams_klim %}<li><a class="profiel-link" href="{{ r.url }}">{{ r.naam }}</a> — {{ r.waarde }}</li>{% endfor %}
+    </ol>
+  </div>
+</div>
+{% endif %}
+
+<h2 class="sectiekop">Speeldagen</h2>
+{% if speeldagen %}
+  {% for sd in speeldagen %}
+  <h3 class="maandkop">{{ sd.speeldag['title'] }} · {{ sd.speeldag['date']|dag }}</h3>
+  {% if sd.games %}
+  <div class="wedstrijd-lijst">
+    {% for g in sd.games %}
+    <div class="kaart wedstrijd">
+      <div class="wedstrijd-teams">
+        <span class="team-naam {{ 'winnaar' if g['winner_team_id'] == g['team1_id'] }}">
+          <a class="profiel-link" href="{{ url_for('team_profiel', team_id=g['team1_id']) }}">{{ namen[g['team1_id']] }}</a></span>
+        <span class="vs">vs</span>
+        <span class="team-naam {{ 'winnaar' if g['winner_team_id'] == g['team2_id'] }}">
+          <a class="profiel-link" href="{{ url_for('team_profiel', team_id=g['team2_id']) }}">{{ namen[g['team2_id']] }}</a></span>
+      </div>
+      <div class="wedstrijd-meta">
+        {% if g['status'] == 'gespeeld' %}🏆 {{ namen[g['winner_team_id']] }} wint · {{ g['played_at']|datum }}
+        {% else %}📅 Gepland op {{ g['scheduled_at']|datum }}{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="kaart leeg">Nog geen wedstrijden op deze speeldag.</div>
+  {% endif %}
+  {% endfor %}
+{% else %}
+<div class="kaart leeg">Dit seizoen heeft nog geen speeldagen.</div>
+{% endif %}
+
+{% endblock %}

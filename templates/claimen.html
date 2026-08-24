@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block titel %}Kies je naam{% endblock %}
+{% block inhoud %}
+
+<div class="login-wrap">
+  <div class="kaart login-kaart breed-kaart">
+    <h1>Kies je naam</h1>
+    {% if accounts %}
+    <p class="stil">Tik op je naam. In de volgende stap kies je een wachtwoord.</p>
+
+    <input type="search" id="claim-zoek" class="zoek-groot" autocomplete="off"
+           placeholder="Zoek je naam…" data-zoek="#claim-lijst">
+
+    <div class="naam-keuze" id="claim-lijst">
+      {% for a in accounts %}
+      <a class="naam-knop" href="{{ url_for('claim_account', speler_id=a['id']) }}">
+        <span class="naam-letter">{{ a['naam'][0]|upper }}</span>
+        <span class="naam">{{ a['name'] }}{% if a['nickname'] %}
+          <span class="stil klein-tekst">({{ a['nickname'] }})</span>{% endif %}</span>
+      </a>
+      {% endfor %}
+    </div>
+
+    <p class="stil klein-tekst ruimte-boven">Staat je naam er niet bij? Dan is je account
+       al opgeëist of nog niet aangemaakt — vraag het even aan de organisatie.</p>
+    {% else %}
+    <p class="stil">Er wachten momenteel geen accounts op een eigenaar. Heb je al een
+       account, log dan gewoon in.</p>
+    {% endif %}
+    <p class="stil klein-tekst">Heb je al een wachtwoord?
+       <a href="{{ url_for('inloggen') }}">Log hier in</a>.</p>
+  </div>
+</div>
+
+{% endblock %}

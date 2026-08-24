@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block titel %}{{ t['name'] }}{% endblock %}
+{% block inhoud %}
+
+<section class="held">
+  <h1>{{ t['name'] }} <span class="pil pil-fase pil-{{ t['status'] }}">{{ label }}</span></h1>
+  <p>📅 {{ t['date']|dag }} · vanaf {{ t['start_tijd'] }}
+     {% if t['description'] %}<br>{{ t['description'] }}{% endif %}</p>
+  <div class="held-cijfers">
+    <div class="cijfer"><strong>{{ teams|length }}</strong><span>teams</span></div>
+    <div class="cijfer"><strong>{{ t['bracket_ronden'] }}</strong><span>wedstrijden per team</span></div>
+    <div class="cijfer"><strong>{{ t['ko_teams'] }}</strong><span>naar de knockout</span></div>
+    <div class="cijfer"><strong>{{ t['potten'] }}</strong><span>potten</span></div>
+  </div>
+  {% if heeft_loting %}
+  <p class="ruimte-boven">
+    <a class="knop primair" href="{{ url_for('toernooi_loting', toernooi_id=t['id']) }}">Naar loting</a>
+    {% if is_organisator %}
+    <a class="knop" href="{{ url_for('toernooi_beheer', toernooi_id=t['id']) }}">Beheren</a>
+    {% endif %}
+  </p>
+  {% elif is_organisator %}
+  <p class="ruimte-boven"><a class="knop primair" href="{{ url_for('toernooi_beheer', toernooi_id=t['id']) }}">Toernooi klaarzetten</a></p>
+  {% endif %}
+</section>
+
+{% if winnaar %}
+<div class="kaart winnaar-kaart">
+  <div class="winnaar-beker">🏆</div>
+  <div>
+    <p class="record-titel">Toernooiwinnaar</p>
+    <p class="winnaar-naam"><a class="profiel-link" href="{{ url_for('team_profiel', team_id=winnaar['id']) }}">{{ winnaar['name'] }}</a></p>
+  </div>
+</div>
+{% endif %}
+
+{% if t['status'] == 'opzet' %}
+<div class="kaart leeg">
+  <p>Dit toernooi is nog niet geloot.</p>
+  <p class="klein-tekst">De organisatie stelt de deelnemende teams samen. Zodra alles klaar is,
+     worden de potten getrokken en verschijnt hier het volledige programma.</p>
+</div>
+{% else %}
+
+<div class="tabs" data-tabs>
+  {% if session.get('speler_id') %}
+  <button class="tab actief" data-tab="mijn">Mijn wedstrijden{% if mijn_wedstrijden %} ({{ mijn_wedstrijden|length }}){% endif %}</button>
+  <button class="tab" data-tab="stand">Stand</button>
+  {% else %}
+  <button class="tab actief" data-tab="stand">Stand</button>
+  {% endif %}
+  <button class="tab" data-tab="kalender">Kalender</button>
+  {% if kolommen %}<button class="tab" data-tab="knockout">Knockout</button>{% endif %}
+  <button class="tab" data-tab="teams">Teams</button>
+</div>
+
+<!-- ------------------------------------------------------ mijn wedstrijden -- -->
+{% if session.get('speler_id') %}
+<div data-paneel="mijn" class="paneel">
+  {% if mijn_wedstrijden %}
+  <p class="stil klein-tekst">Meld hier meteen de uitslag na afloop — je hoeft dus niet
+     naar je profiel te gaan. Zodra iemand van elk team dezelfde winnaar meldt, is het
+     resultaat officieel.</p>
+  <div class="wedstrijd-lijst">
+    {% for m in mijn_wedstrijden %}
+      {% with volgende = url_for('toernooi_detail', toernooi_id=t['id']) %}
+        {% include "_meld_kaart.html" %}
+      {% endwith %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="kaart leeg">
+    {% if mijn_gespeeld %}Je hebt al je wedstrijden van dit toernooi gespeeld.
+    {% else %}Je hebt (nog) geen wedstrijden in dit toernooi.{% endif %}
+  </div>
+  {% endif %}
+
+  {% if mijn_gespeeld %}
+  <h3 class="maandkop">Al gespeeld</h3>
+  <div class="kaart">
+    <table class="tabel compact">
+      <thead><tr><th>Wedstrijd</th><th>Fase</th><th>Resultaat</th><th>Gespeeld op</th></tr></thead>
+      <tbody>
+        {% for g in mijn_gespeeld %}
+        {% set eigen = g['team1_id'] if session['speler_id'] in (g['a1'], g['a2']) else g['team2_id'] %}
+        <tr>
+          <td class="naam">{{ namen[g['team1_id']] }} <span class="vs-klein">vs</span> {{ namen[g['team2_id']] }}</td>
+          <td class="stil">{{ g|fase }}</td>
+          <td>{% if g['winner_team_id'] == eigen %}<span class="pil pil-actief">gewonnen</span>
+              {% else %}<span class="pil pil-rood">verloren</span>{% endif %}</td>
+          <td class="stil">{{ g['played_at']|datum }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ------------------------------------------------------------- stand -- -->
+<div data-paneel="stand" class="paneel {{ 'verborgen' if session.get('speler_id') }}">
+  <div class="kaart">
+    <h3>Bracketfase</h3>
+    {% if open_shootouts %}
+    <p class="shootout-melding">⚡ <strong>{{ open_shootouts }} shootout(s) nodig.</strong>
+       Deze teams staan gelijk en het onderlinge duel
+       gaf geen uitsluitsel.</p>
+    {% endif %}
+    <p class="klein-tekst stil">Winst = 3 punten. De bovenste {{ t['ko_teams'] }} teams gaan door
+      naar de knockout. Staan teams gelijk, dan telt het onderlinge duel. Indien dit niet gespeeld is,
+      volgt er een shootout tussen alle betrokken teams. Een shootout beslist enkel wie
+      doorstoot en telt niet mee voor de ELO.</p>
+    <table class="tabel">
+      <thead>
+        <tr>
+          <th class="kol-rang">#</th><th>Team</th><th class="verbergen-mobiel">Pot</th>
+          <th class="kol-num">G</th><th class="kol-num">W</th><th class="kol-num">V</th>
+          <th class="kol-num">Ptn</th><th class="verbergen-mobiel">Vorm</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in stand %}
+        <tr class="{{ 'rij-door' if r.doorstoot }}{{ ' rij-onbeslist' if r.onbeslist }}">
+          <td class="kol-rang">{{ r.positie }}</td>
+          <td class="wikkel">
+            <span class="naam"><a class="profiel-link met-avatar" href="{{ url_for('team_profiel', team_id=r.team_id) }}">
+              {%- if r.avatar %}<img class="avatar-mini" src="{{ url_for('media', bestand=r.avatar) }}" alt="">
+              {%- else %}<span class="avatar-mini avatar-fallback">{{ r.naam[0]|upper }}</span>{% endif %} {{ r.naam }}</a></span>
+            <div class="klein-tekst stil">{{ r.spelers }}</div>
+            {% if r.onbeslist %}<span class="pil pil-rood">shootout nodig</span>
+            {% elif r.gedeeld %}<span class="pil">gedeelde plaats</span>{% endif %}
+          </td>
+          <td class="verbergen-mobiel"><span class="pot-pil pot-{{ r.pot }}">Pot {{ r.pot }}</span></td>
+          <td class="kol-num">{{ r.gespeeld }}</td>
+          <td class="kol-num">{{ r.winst }}</td>
+          <td class="kol-num">{{ r.verlies }}</td>
+          <td class="kol-num"><span class="elo-badge">{{ r.punten }}</span></td>
+          <td class="verbergen-mobiel">
+            {% for v in r.vorm[-5:] %}<span class="vorm-bol vorm-{{ v }}">{{ v }}</span>{% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if t['status'] == 'bracket' %}
+    <p class="klein-tekst stil ruimte-boven">De lijn onder plaats {{ t['ko_teams'] }} bepaalt wie doorgaat.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ---------------------------------------------------------- kalender -- -->
+<div data-paneel="kalender" class="paneel verborgen">
+  {% for groep in groepen %}
+  <h3 class="maandkop">{{ groep.titel }}{% if groep.tijd %} · {{ groep.tijd|datum }}{% endif %}</h3>
+  <div class="wedstrijd-lijst">
+    {% for g in groep.games %}
+    <div class="kaart wedstrijd">
+      <div class="wedstrijd-teams">
+        <span class="team-naam {{ 'winnaar' if g['winner_team_id'] == g['team1_id'] }}">
+          {% if g['team1_id'] %}<a class="profiel-link" href="{{ url_for('team_profiel', team_id=g['team1_id']) }}">{{ namen[g['team1_id']] }}</a>
+          {% else %}<em class="stil">nog te bepalen</em>{% endif %}
+          {% if deltas.get((g['id'], g['team1_id'])) is not none %}
+            {% set d = deltas[(g['id'], g['team1_id'])] %}
+            <span class="delta {{ 'plus' if d >= 0 else 'min' }}">{{ '+' if d >= 0 }}{{ d|elo }}</span>
+          {% endif %}
+        </span>
+        <span class="vs">vs</span>
+        <span class="team-naam {{ 'winnaar' if g['winner_team_id'] == g['team2_id'] }}">
+          {% if g['team2_id'] %}<a class="profiel-link" href="{{ url_for('team_profiel', team_id=g['team2_id']) }}">{{ namen[g['team2_id']] }}</a>
+          {% else %}<em class="stil">nog te bepalen</em>{% endif %}
+          {% if deltas.get((g['id'], g['team2_id'])) is not none %}
+            {% set d = deltas[(g['id'], g['team2_id'])] %}
+            <span class="delta {{ 'plus' if d >= 0 else 'min' }}">{{ '+' if d >= 0 }}{{ d|elo }}</span>
+          {% endif %}
+        </span>
+      </div>
+      <div class="wedstrijd-meta">
+        {% if g['status'] == 'gespeeld' %}🏆 {{ namen[g['winner_team_id']] }} wint · {{ g['played_at']|datum }}
+        {% else %}📅 {{ g['scheduled_at']|datum }}{% endif %}
+        {% if g['location_id'] and loc_namen.get(g['location_id']) %} · 📍 {{ loc_namen[g['location_id']] }}{% endif %}
+        · <span class="pil">{{ g|fase }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ---------------------------------------------------------- knockout -- -->
+{% if kolommen %}
+<div data-paneel="knockout" class="paneel verborgen">
+  <div class="kaart">
+    <h3>Knockoutschema</h3>
+    <div class="bracket">
+      {% for kolom in kolommen %}
+      <div class="bracket-kolom">
+        <div class="bracket-titel">{{ kolom.titel }}</div>
+        {% for g in kolom.games %}
+        <div class="bracket-game {{ 'gespeeld' if g['status'] == 'gespeeld' }}">
+          {% for kant in [1, 2] %}
+            {% set team_id = g['team1_id'] if kant == 1 else g['team2_id'] %}
+            <div class="bracket-kant {{ 'winnaar' if team_id and g['winner_team_id'] == team_id }}">
+              {% if team_id %}
+                <a class="profiel-link" href="{{ url_for('team_profiel', team_id=team_id) }}">{{ namen[team_id] }}</a>
+              {% else %}<em class="stil">—</em>{% endif %}
+            </div>
+          {% endfor %}
+          <div class="bracket-meta">
+            {% if g['status'] == 'gespeeld' %}{{ g['played_at']|dag }}
+            {% else %}{{ g['scheduled_at']|datum }}{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ------------------------------------------------------------- teams -- -->
+<div data-paneel="teams" class="paneel verborgen">
+  <div class="kaart">
+    <h3>Deelnemers</h3>
+    <table class="tabel">
+      <thead><tr><th>Team</th><th class="wikkel">Spelers</th><th class="verbergen-mobiel">Pot</th><th class="kol-elo">ELO</th></tr></thead>
+      <tbody>
+        {% for team in teams %}
+        <tr>
+          <td><span class="naam"><a class="profiel-link met-avatar" href="{{ url_for('team_profiel', team_id=team.id) }}">
+            {%- if team.avatar %}<img class="avatar-mini" src="{{ url_for('media', bestand=team.avatar) }}" alt="">
+            {%- else %}<span class="avatar-mini avatar-fallback">{{ team.naam[0]|upper }}</span>{% endif %} {{ team.naam }}</a></span></td>
+          <td class="stil wikkel">{{ team.spelers }}</td>
+          <td class="verbergen-mobiel">{% if team.pot %}<span class="pot-pil pot-{{ team.pot }}">Pot {{ team.pot }}</span>{% else %}—{% endif %}</td>
+          <td class="kol-elo"><span class="elo-badge">{{ team.elo|elo }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

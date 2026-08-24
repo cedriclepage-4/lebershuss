@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titel %}Account maken{% endblock %}
+{% block inhoud %}
+
+<div class="login-wrap">
+  <div class="kaart login-kaart">
+    <h1>Account maken</h1>
+    <p class="stil">Maak je spelersaccount aan en verschijn meteen in het klassement.
+       Iedereen start op 1000 ELO.</p>
+    {% if eerste %}
+    <p class="pil pil-actief">Jij bent de eerste: dit account wordt meteen de eigenaar
+       en kan de organisatie regelen.</p>
+    {% endif %}
+    <form method="post">
+      <label>Je échte voor- en achternaam
+        <input type="text" name="naam" maxlength="40" autocomplete="name" autofocus required></label>
+      <p class="stil klein-tekst velduitleg">Dit is je accountnaam, waarmee je ook inlogt.
+         Ze ligt daarna vast en kan je zelf niet meer wijzigen — zo weet iedereen wie wie is.</p>
+      <label>Bijnaam (optioneel)
+        <input type="text" name="bijnaam" maxlength="30" autocomplete="nickname"
+               placeholder="bv. De Muur"></label>
+      <p class="stil klein-tekst velduitleg">Zó verschijn je overal op de site. Deze mag je
+         altijd veranderen; laat je hem leeg, dan tonen we je echte naam.</p>
+      <label>Wachtwoord (min. 6 tekens)
+        <input type="password" name="wachtwoord" minlength="6" autocomplete="new-password" required></label>
+      <button type="submit" class="knop primair breed">Account maken</button>
+    </form>
+    <p class="stil klein-tekst ruimte-boven">Al een account?
+       <a href="{{ url_for('inloggen') }}">Log hier in</a>.</p>
+  </div>
+</div>
+
+{% endblock %}
