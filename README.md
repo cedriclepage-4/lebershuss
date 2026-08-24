@@ -278,6 +278,10 @@ vaak enkel PHP (WordPress en co.) — dat volstaat níét. Vraag je hoster of je
 neem dan een kleine **VPS**: daar installeer je Python zelf en zet je nginx of
 Apache ervoor voor https.
 
+> 📘 **[DEPLOY.md](DEPLOY.md)** bevat een volledige handleiding stap voor stap:
+> van een lege VPS tot een werkende site op je eigen domein, met https,
+> automatisch herstarten en updates uitrollen.
+
 **Zo zet je hem op:**
 
 ```bash

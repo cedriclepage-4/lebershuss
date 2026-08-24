@@ -13,6 +13,7 @@ melden zelf hun uitslagen; organisatoren beheren seizoenen, speeldagen en
 wedstrijden.
 """
 
+import hashlib
 import os
 import re
 import secrets
@@ -1049,11 +1050,35 @@ def statisch(bestand):
     return send_from_directory(STATIC_MAP, os.path.basename(bestand))
 
 
+def _static_versie():
+    """Een korte code die verandert zodra style.css of app.js wijzigt.
+
+    De service worker bewaart die vaste bestanden en haalt ze daarna uit zijn
+    eigen cache. Zonder deze code zou een bezoeker na een update nog altijd de
+    óude stijl zien: de cache wordt namelijk pas opgeruimd als de naam ervan
+    verandert. Door de inhoud van de bestanden te hashen gebeurt dat vanzelf,
+    en hoeven we bij elke aanpassing niets handmatig op te hogen.
+    """
+    stempel = hashlib.sha1()
+    for naam in sorted(_TOEGELATEN_STATIC):
+        pad = os.path.join(STATIC_MAP, naam)
+        try:
+            with open(pad, "rb") as f:
+                stempel.update(f.read())
+        except OSError:
+            continue
+    return stempel.hexdigest()[:12]
+
+
 @app.route("/sw.js")
 def service_worker():
     """De service worker moet vanaf de hoofdmap geserveerd worden, anders mag hij
     enkel /static/ beheren en werkt de app niet offline."""
-    antwoord = send_from_directory(STATIC_MAP, "sw.js", mimetype="application/javascript")
+    with open(os.path.join(STATIC_MAP, "sw.js"), encoding="utf-8") as f:
+        inhoud = f.read()
+    # De cachenaam meegeven, zodat een update de oude bestanden weggooit.
+    inhoud = inhoud.replace("__VERSIE__", _static_versie())
+    antwoord = app.response_class(inhoud, mimetype="application/javascript")
     antwoord.headers["Service-Worker-Allowed"] = "/"
     antwoord.headers["Cache-Control"] = "no-cache"
     return antwoord

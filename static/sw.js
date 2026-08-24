@@ -5,7 +5,11 @@
  * een oude stand ziet. Enkel als het netwerk wegvalt, tonen we wat we hebben.
  * Vaste bestanden (stijl, script, iconen) komen wel eerst uit de cache.
  */
-const VERSIE = "lebershuss-v1";
+/* __VERSIE__ wordt door de server ingevuld met een code die uit de inhoud van
+ * style.css, app.js en de iconen berekend is. Verandert er één van, dan krijgt
+ * de cache een nieuwe naam en wordt de oude opgeruimd — bezoekers zien je
+ * aanpassingen dus meteen na een update, zonder iets te moeten wissen. */
+const VERSIE = "lebershuss-__VERSIE__";
 const VASTE_BESTANDEN = [
   "/static/style.css",
   "/static/app.js",
