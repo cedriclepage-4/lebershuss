@@ -255,17 +255,29 @@
   <p class="stil klein-tekst">Normaal nodigt speler 1 zijn maat uit en aanvaardt die.
      Hier zet je in één keer een <strong>actief</strong> team klaar — handig bij
      inschrijvingen waarin het duo al vastligt.</p>
-  <form method="post" action="{{ url_for('team_toevoegen') }}" class="rij-form">
-    <input type="text" name="naam" placeholder="Teamnaam" maxlength="40" required>
-    <select name="speler1" required>
-      <option value="" disabled selected>Speler 1…</option>
-      {% for p in spelers %}<option value="{{ p['id'] }}">{{ p['naam'] }} (#{{ p['id'] }})</option>{% endfor %}
-    </select>
-    <select name="speler2" required>
-      <option value="" disabled selected>Speler 2…</option>
-      {% for p in spelers %}<option value="{{ p['id'] }}">{{ p['naam'] }} (#{{ p['id'] }})</option>{% endfor %}
-    </select>
-    <button type="submit" class="knop primair">Team aanmaken</button>
+  <form method="post" action="{{ url_for('team_toevoegen') }}">
+    <div class="duo-keuze">
+      {% for nr in (1, 2) %}
+      <fieldset>
+        <legend>Speler {{ nr }}</legend>
+        <input type="search" id="speler{{ nr }}-zoek" data-filter-doel="#speler{{ nr }}-keuze"
+               placeholder="Zoek op naam of nummer…" autocomplete="off">
+        <select name="speler{{ nr }}" id="speler{{ nr }}-keuze" required
+                {% if spelers|length > 6 %}size="8"{% endif %}>
+          <option value="" disabled selected>Kies een speler…</option>
+          {% for p in spelers %}
+          <option value="{{ p['id'] }}" data-term="{{ p['naam'] }} {{ p['name'] }} {{ p['id'] }}">
+            #{{ p['id'] }} · {{ p['naam'] }}</option>
+          {% endfor %}
+        </select>
+        <p class="stil klein-tekst" id="speler{{ nr }}-teller"></p>
+      </fieldset>
+      {% endfor %}
+    </div>
+    <div class="rij-form">
+      <input type="text" name="naam" placeholder="Teamnaam" maxlength="40" required>
+      <button type="submit" class="knop primair">Team aanmaken</button>
+    </div>
   </form>
 </div>
 

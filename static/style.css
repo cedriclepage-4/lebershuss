@@ -575,6 +575,13 @@ input[type="file"] { padding: 7px 10px; }
 .tegel-cijfer { margin: 8px 0 6px; font-weight: 700; color: var(--navy-donker); font-size: .95rem; }
 .aandacht-kaart { border: 1px solid #fed7aa; background: #fff7ed; }
 /* Kaart met onomkeerbare ingrepen: leegmaken, terugzetten. */
+/* Twee spelers naast elkaar kiezen (team samenstellen in het paneel). */
+.duo-keuze { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 4px; }
+.duo-keuze fieldset { flex: 1 1 260px; min-width: 0; }
+.duo-keuze input[type="search"] { margin-bottom: 8px; }
+.duo-keuze select { width: 100%; }
+.duo-keuze p { margin: 4px 0 0; min-height: 1.1em; }
+
 /* Team dat niet gekozen kan worden (speler zit al in een ander team). */
 .keuze-vak.keuze-uit { opacity: .55; cursor: not-allowed; background: var(--fond); }
 .keuze-vak.keuze-uit strong { text-decoration: line-through; }
