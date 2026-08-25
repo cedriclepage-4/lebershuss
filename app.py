@@ -58,7 +58,10 @@ UPLOAD_MAP = os.path.join(STATIC_MAP, "uploads")
 BACKUP_MAP = os.path.join(BASE_DIR, "backups")
 
 app = Flask(__name__, template_folder=TEMPLATE_MAP, static_folder=None)
-app.config["MAX_CONTENT_LENGTH"] = 3 * 1024 * 1024  # max. 3 MB per upload
+# Ruim genoeg voor een databaseback-up; profielfoto's worden apart beperkt tot
+# 3 MB in bewaar_avatar(), zodat niemand een reuzenfoto kan uploaden.
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024
+MAX_AVATAR = 3 * 1024 * 1024
 
 _SLEUTELBESTAND = os.path.join(BASE_DIR, ".secret_key")
 if os.path.exists(_SLEUTELBESTAND):
@@ -977,6 +980,12 @@ def bewaar_avatar(bestand, prefix, oud=None):
     ext = bestand.filename.rsplit(".", 1)[-1].lower()
     if ext not in _AVATAR_EXT:
         return None
+    # Grootte zelf nakijken: de algemene uploadlimiet staat hoog voor back-ups.
+    bestand.stream.seek(0, os.SEEK_END)
+    if bestand.stream.tell() > MAX_AVATAR:
+        bestand.stream.seek(0)
+        return None
+    bestand.stream.seek(0)
     os.makedirs(UPLOAD_MAP, exist_ok=True)
     naam = f"avatar_{prefix}_{secrets.token_hex(4)}.{ext}"
     bestand.save(os.path.join(UPLOAD_MAP, naam))
@@ -1586,13 +1595,10 @@ def claim_open():
 def externe_url(endpoint, **kwargs):
     """Het volledige adres van een pagina, zoals een bezoeker het moet intypen.
 
-    Normaal leidt Flask dat af uit het adres waarmee jij de site opende. Draai je
-    achter een domeinnaam terwijl jij zelf via het IP-adres werkt, dan klopt dat
-    niet — vul in dat geval het basisadres in bij Organisatie → Instellingen.
+    Flask leidt dat af uit het adres waarmee de pagina opgevraagd werd — dus uit
+    het domein waarmee jij het organisatiepaneel opent. Draai je achter nginx,
+    dan zorgt ACHTER_PROXY=1 ervoor dat https ook klopt.
     """
-    basis = (instelling(get_db(), "basisadres", "") or "").strip().rstrip("/")
-    if basis:
-        return basis + url_for(endpoint, **kwargs)
     return url_for(endpoint, _external=True, **kwargs)
 
 
@@ -2220,7 +2226,6 @@ def admin_spelers():
     return render_template("admin_spelers.html", spelers=spelers, teams=teams,
                            claim_open=claim_open(), claim_log=log,
                            claim_adres=externe_url("claimen"),
-                           basisadres=instelling(db, "basisadres", ""),
                            vrij=[p for p in spelers if not p["password_hash"]],
                            maand_label=f"{MAANDEN[datetime.now().month - 1]} "
                                        f"{datetime.now().year}")
@@ -2237,13 +2242,13 @@ def admin_klassement():
 
 @app.route("/admin/instellingen", methods=["GET"])
 @login_vereist
+@eigenaar_vereist
 def admin_instellingen():
     db = get_db()
     return render_template("admin_instellingen.html",
                            k_speler=instelling(db, "k_speler", "32"),
                            k_team=instelling(db, "k_team", "32"),
-                           basisadres=instelling(db, "basisadres", ""),
-                           gezien_adres=request.host_url.rstrip("/"),
+                           start_elo=f"{START_ELO:.0f}",
                            backups=backup_lijst()[:6],
                            backup_map=BACKUP_MAP)
 
@@ -2484,6 +2489,9 @@ def speler_definitief_verwijderen(speler_id):
     wis_avatar(speler["avatar"])
     db.execute("DELETE FROM game_stats WHERE player_id = ?", (speler_id,))
     db.execute("DELETE FROM game_reports WHERE player_id = ?", (speler_id,))
+    # Ook zijn regels uit het claimlogboek: die zouden anders naar een profiel
+    # verwijzen dat niet meer bestaat.
+    db.execute("DELETE FROM claim_log WHERE player_id = ?", (speler_id,))
     db.execute("DELETE FROM rating_history WHERE entity_type = 'speler' "
                "AND entity_id = ?", (speler_id,))
     db.execute("DELETE FROM season_ratings WHERE entity_type = 'speler' "
@@ -2822,6 +2830,7 @@ def rang_verwijderen(rang_id):
 
 @app.route("/admin/instellingen", methods=["POST"])
 @login_vereist
+@eigenaar_vereist
 def instellingen_opslaan():
     db = get_db()
     try:
@@ -2894,6 +2903,7 @@ def backup_lijst():
 
 @app.route("/admin/backup/nu", methods=["POST"])
 @login_vereist
+@eigenaar_vereist
 def backup_nu():
     try:
         pad = maak_backup("handmatig")
@@ -2906,6 +2916,7 @@ def backup_nu():
 
 @app.route("/admin/backup/download")
 @login_vereist
+@eigenaar_vereist
 def backup_download():
     """Een verse kopie van de database rechtstreeks downloaden."""
     pad = maak_backup("download")
@@ -2914,28 +2925,9 @@ def backup_download():
                                download_name=f"shuss_{date.today():%Y-%m-%d}.db")
 
 
-@app.route("/admin/basisadres", methods=["POST"])
-@login_vereist
-def basisadres_opslaan():
-    """Het adres waarop bezoekers de site bereiken (voor QR-codes en links)."""
-    db = get_db()
-    adres = (request.form.get("basisadres") or "").strip().rstrip("/")
-    if adres and not adres.startswith(("http://", "https://")):
-        flash("Een basisadres begint met http:// of https:// — bijvoorbeeld "
-              "https://leberschuss.tonzent.be", "fout")
-    else:
-        zet_instelling(db, "basisadres", adres)
-        db.commit()
-        if adres:
-            flash(f"Basisadres ingesteld: QR-codes en links wijzen nu naar {adres}.", "ok")
-        else:
-            flash("Basisadres gewist: de site gebruikt weer het adres waarmee je "
-                  "ze zelf opent.", "ok")
-    return redirect(url_for("admin_instellingen") + "#adres")
-
-
 @app.route("/admin/league", methods=["POST"])
 @login_vereist
+@eigenaar_vereist
 def league_schakelen():
     """Het leaguegedeelte tonen of verbergen voor de spelers."""
     db = get_db()
@@ -3008,6 +3000,154 @@ def speler_vrijgeven(speler_id):
     return redirect(url_for("admin_spelers") + "#claimen")
 
 
+# --------------------------------------------- database legen en terugzetten --
+#
+# Twee zware ingrepen, allebei enkel voor de eigenaar en allebei met een woord
+# dat je zelf moet intypen. Vóór elke ingreep gaat er automatisch een back-up
+# naar de map backups/, zodat een vergissing nooit definitief is.
+
+# Tabellen die enkel over gespeelde geschiedenis gaan (spelers en teams blijven).
+GESCHIEDENIS_TABELLEN = ["game_stats", "game_reports", "rating_history",
+                         "season_ratings", "games", "tournament_teams",
+                         "tournament_locations", "tournaments", "matchdays",
+                         "seasons"]
+# Daarbovenop bij "alles wissen":
+ALLES_TABELLEN = GESCHIEDENIS_TABELLEN + ["claim_log", "teams", "players"]
+
+
+def _woord_klopt(verwacht):
+    return " ".join((request.form.get("bevestiging") or "").split()).lower() == verwacht
+
+
+@app.route("/admin/database/legen", methods=["POST"])
+@login_vereist
+@eigenaar_vereist
+def database_legen():
+    db = get_db()
+    alles = request.form.get("omvang") == "alles"
+    woord = "wis alles" if alles else "wis geschiedenis"
+    if not _woord_klopt(woord):
+        flash(f"Typ “{woord}” in het vakje om te bevestigen. Er is niets gewist.", "fout")
+        return redirect(url_for("admin_instellingen") + "#leegmaken")
+
+    try:
+        kopie = maak_backup("voor-legen")
+    except Exception as fout:
+        flash(f"De veiligheidsback-up lukte niet ({fout}); er is niets gewist.", "fout")
+        return redirect(url_for("admin_instellingen") + "#leegmaken")
+
+    tabellen = ALLES_TABELLEN if alles else GESCHIEDENIS_TABELLEN
+    db.execute("PRAGMA foreign_keys = OFF")
+    for tabel in tabellen:
+        db.execute(f"DELETE FROM {tabel}")
+    if not alles:
+        # Spelers en teams blijven, maar beginnen weer van nul.
+        db.execute("UPDATE players SET elo = ?", (START_ELO,))
+        db.execute("UPDATE teams SET elo = ?", (START_ELO,))
+    db.execute("DELETE FROM sqlite_sequence")
+    db.commit()
+    db.execute("PRAGMA foreign_keys = ON")
+    for map_ in (UPLOAD_MAP,) if alles else ():
+        for naam in os.listdir(map_) if os.path.isdir(map_) else []:
+            if _AVATAR_RE.match(naam):
+                try:
+                    os.remove(os.path.join(map_, naam))
+                except OSError:
+                    pass
+    if alles:
+        db.execute("UPDATE settings SET value = '0' WHERE key = 'claim_open'")
+        db.commit()
+        session.clear()
+        flash("De database is volledig leeggemaakt. Maak nu een nieuw account aan — "
+              "het eerste account wordt automatisch de eigenaar. Een back-up van de "
+              f"oude stand staat in backups/{os.path.basename(kopie)}.", "ok")
+        return redirect(url_for("registreren"))
+
+    flash("Alle wedstrijden, toernooien en seizoenen zijn gewist; spelers en teams "
+          f"blijven en staan weer op {START_ELO:.0f} ELO. Een back-up van de oude "
+          f"stand staat in backups/{os.path.basename(kopie)}.", "ok")
+    return redirect(url_for("admin_instellingen") + "#leegmaken")
+
+
+def _is_geldige_database(pad):
+    """Is dit echt een Leberschuss-database? Geeft None terug als ze deugt."""
+    try:
+        with open(pad, "rb") as f:
+            if f.read(16) != b"SQLite format 3\x00":
+                return "Dit is geen databasebestand (.db) van deze site."
+        keur = sqlite3.connect(f"file:{pad}?mode=ro", uri=True)
+        if keur.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+            keur.close()
+            return "Het bestand is beschadigd."
+        aanwezig = {r[0] for r in keur.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'")}
+        keur.close()
+        ontbreekt = {"players", "teams", "games", "settings"} - aanwezig
+        if ontbreekt:
+            return ("Dit lijkt geen Leberschuss-database: "
+                    f"{', '.join(sorted(ontbreekt))} ontbreekt.")
+    except Exception as fout:
+        return f"Het bestand kon niet gelezen worden ({fout})."
+    return None
+
+
+@app.route("/admin/backup/terugzetten", methods=["POST"])
+@login_vereist
+@eigenaar_vereist
+def backup_terugzetten():
+    if not _woord_klopt("terugzetten"):
+        flash("Typ “terugzetten” in het vakje om te bevestigen. Er is niets "
+              "gewijzigd.", "fout")
+        return redirect(url_for("admin_instellingen") + "#terugzetten")
+    bestand = request.files.get("bestand")
+    if not bestand or not bestand.filename:
+        flash("Kies eerst een back-upbestand.", "fout")
+        return redirect(url_for("admin_instellingen") + "#terugzetten")
+
+    os.makedirs(BACKUP_MAP, exist_ok=True)
+    tijdelijk = os.path.join(BACKUP_MAP, f"upload_{secrets.token_hex(4)}.db")
+    bestand.save(tijdelijk)
+
+    bezwaar = _is_geldige_database(tijdelijk)
+    if bezwaar:
+        os.remove(tijdelijk)
+        flash(f"{bezwaar} Er is niets gewijzigd.", "fout")
+        return redirect(url_for("admin_instellingen") + "#terugzetten")
+
+    try:
+        kopie = maak_backup("voor-terugzetten")
+    except Exception as fout:
+        os.remove(tijdelijk)
+        flash(f"De veiligheidsback-up lukte niet ({fout}); er is niets gewijzigd.", "fout")
+        return redirect(url_for("admin_instellingen") + "#terugzetten")
+
+    # De verbinding van dit verzoek eerst sluiten, anders houdt ze het oude
+    # bestand nog vast terwijl we het vervangen.
+    oud = g.pop("db", None)
+    if oud is not None:
+        oud.close()
+    os.replace(tijdelijk, DB_PATH)
+    # Resten van de vorige database: die horen niet bij het nieuwe bestand.
+    for extra in (DB_PATH + "-wal", DB_PATH + "-shm"):
+        if os.path.exists(extra):
+            os.remove(extra)
+    init_db(DB_PATH)                      # schema bijwerken als de kopie ouder is
+
+    db = get_db()
+    aantal = db.execute("SELECT COUNT(*) AS n FROM players").fetchone()["n"]
+    ik = db.execute("SELECT 1 FROM players WHERE id = ?",
+                    (session.get("speler_id"),)).fetchone()
+    if not ik:
+        session.clear()
+        flash("De database is vervangen. Jouw account staat niet in dit bestand, "
+              "dus je bent uitgelogd. Een back-up van de vorige stand staat in "
+              f"backups/{os.path.basename(kopie)}.", "ok")
+        return redirect(url_for("inloggen"))
+    flash(f"De database is vervangen: {aantal} speler(s) ingeladen. Een back-up van "
+          f"de vorige stand staat in backups/{os.path.basename(kopie)}.", "ok")
+    return redirect(url_for("admin_instellingen") + "#terugzetten")
+
+
 @app.route("/mijn-wachtwoord", methods=["POST"])
 @speler_vereist
 def wachtwoord_wijzigen():
@@ -3031,6 +3171,7 @@ def wachtwoord_wijzigen():
 
 @app.route("/admin/herberekenen", methods=["POST"])
 @login_vereist
+@eigenaar_vereist
 def herberekenen():
     db = get_db()
     for melding in na_resultaat(db):

@@ -15,7 +15,7 @@
   <p class="klein-tekst">🙈 Het leaguegedeelte staat uit: <strong>spelers zien de
      seizoenen niet</strong>. Je kan hier gerust alles klaarzetten; het wordt pas
      zichtbaar wanneer je de league aanzet bij
-     <a class="profiel-link" href="{{ url_for('admin_instellingen') }}#league">Instellingen</a>.</p>
+     {% if is_eigenaar %}<a class="profiel-link" href="{{ url_for('admin_instellingen') }}#league">Instellingen</a>{% else %}de eigenaar{% endif %}.</p>
 </div>
 {% endif %}
 

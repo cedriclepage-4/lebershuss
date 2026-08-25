@@ -14,7 +14,7 @@
 <div class="kaart aandacht-kaart">
   <p class="klein-tekst">🙈 Het leaguegedeelte staat uit: <strong>spelers zien deze
      wedstrijden niet</strong> en kunnen ze ook niet melden. Zet het aan bij
-     <a class="profiel-link" href="{{ url_for('admin_instellingen') }}#league">Instellingen</a>
+     {% if is_eigenaar %}<a class="profiel-link" href="{{ url_for('admin_instellingen') }}#league">Instellingen</a>{% else %}de eigenaar{% endif %}
      wanneer je de league wil openstellen.</p>
 </div>
 {% endif %}

@@ -436,6 +436,14 @@ def init_db(pad: str = DB_PATH) -> None:
                      (sleutel, waarde))
     # Het oude algemene adminwachtwoord is vervangen door rollen per speler.
     conn.execute("DELETE FROM settings WHERE key = 'admin_hash'")
+    # Regels in het claimlogboek van spelers die intussen gewist zijn: die
+    # verwijzen naar een profiel dat niet meer bestaat. (Opruimen van vroeger;
+    # bij het verwijderen van een speler gaan ze nu meteen mee.)
+    conn.execute("""
+        DELETE FROM claim_log
+        WHERE player_id IS NOT NULL
+          AND player_id NOT IN (SELECT id FROM players)
+    """)
     conn.commit()
     conn.close()
 

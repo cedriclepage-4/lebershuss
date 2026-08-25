@@ -47,8 +47,7 @@
     <a class="knop" href="{{ url_for('claim_scherm') }}">📺 Toon op het grote scherm</a>
     <span class="stil klein-tekst">— QR-code voor de beamer; spelers scannen en komen
       meteen op de opeispagina. Het adres in de code is
-      <code>{{ claim_adres }}</code>{% if not basisadres %} (afgeleid uit jouw adres —
-      klopt dat niet, vul dan het <a class="profiel-link" href="{{ url_for('admin_instellingen') }}#adres">basisadres</a> in){% endif %}.</span>
+      <code>{{ claim_adres }}</code>.</span>
   </p>
 
   {% if claim_log %}

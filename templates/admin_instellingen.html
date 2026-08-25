@@ -66,20 +66,62 @@
   {% endif %}
 </div>
 
-<h2 class="sectiekop" id="adres">Adres van de site</h2>
-<div class="kaart">
-  <p class="stil klein-tekst">Voor QR-codes en links naar buiten toe moet de site weten
-     op welk adres bezoekers haar bereiken. Normaal leidt ze dat gewoon af uit het
-     adres waarmee jij ze opent — je hoeft hier dus <strong>niets</strong> in te vullen.
-     Enkel wanneer die twee verschillen is dit nodig: bijvoorbeeld als jij via
-     <code>{{ gezien_adres }}</code> werkt terwijl de spelers een domeinnaam gebruiken.</p>
-  <form method="post" action="{{ url_for('basisadres_opslaan') }}" class="rij-form">
-    <input type="url" name="basisadres" value="{{ basisadres }}"
-           placeholder="https://leberschuss.tonzent.be (leeg = automatisch)">
-    <button type="submit" class="knop primair">Opslaan</button>
+<h2 class="sectiekop" id="terugzetten">Back-up terugzetten</h2>
+<div class="kaart gevaar-kaart">
+  <p class="stil klein-tekst">Kies een back-upbestand van je computer. Dat wordt de
+     nieuwe database: <strong>alles wat er nu in staat, verdwijnt</strong> en wordt
+     vervangen door wat in het bestand zit. Van de huidige stand wordt eerst
+     automatisch een back-up gemaakt, dus je kan altijd nog terug.</p>
+  <p class="stil klein-tekst">Handig na een misgelopen avond, of om thuis met een kopie
+     te testen. Het bestand wordt eerst gecontroleerd; is het geen geldige
+     Leberschuss-database, dan gebeurt er niets.</p>
+  <form method="post" action="{{ url_for('backup_terugzetten') }}" enctype="multipart/form-data">
+    <label>Back-upbestand (.db)
+      <input type="file" name="bestand" accept=".db" required></label>
+    <div class="rij-form">
+      <input type="text" name="bevestiging" placeholder="terugzetten" autocomplete="off"
+             autocapitalize="none" spellcheck="false" required>
+      <button type="submit" class="knop gevaar">Database vervangen</button>
+    </div>
+    <p class="stil klein-tekst">Typ <code>terugzetten</code> om te bevestigen.</p>
   </form>
-  <p class="stil klein-tekst">Nu in gebruik: <code>{{ basisadres or gezien_adres }}</code>
-     {% if not basisadres %}(automatisch){% endif %}</p>
+</div>
+
+<h2 class="sectiekop" id="leegmaken">Database leegmaken</h2>
+<div class="kaart gevaar-kaart">
+  <p class="stil klein-tekst">Van de huidige stand wordt eerst automatisch een back-up
+     gemaakt. Toch: dit kan je niet ongedaan maken met één klik.</p>
+
+  <h3>Alleen de geschiedenis wissen</h3>
+  <p class="stil klein-tekst">Wist alle <strong>wedstrijden, toernooien, seizoenen en
+     ratings</strong>. Spelers, teams, accounts en rangen blijven staan, en iedereen
+     begint weer op {{ start_elo }} ELO. Zo start je een nieuw seizoen met dezelfde bende.</p>
+  <form method="post" action="{{ url_for('database_legen') }}">
+    <input type="hidden" name="omvang" value="geschiedenis">
+    <div class="rij-form">
+      <input type="text" name="bevestiging" placeholder="wis geschiedenis" autocomplete="off"
+             autocapitalize="none" spellcheck="false" required>
+      <button type="submit" class="knop gevaar">Geschiedenis wissen</button>
+    </div>
+    <p class="stil klein-tekst">Typ <code>wis geschiedenis</code> om te bevestigen.</p>
+  </form>
+
+  <h3 class="ruimte-boven">Alles wissen</h3>
+  <p class="stil klein-tekst">Wist alles van hierboven én <strong>alle spelers, teams,
+     accounts en profielfoto's</strong> — dus ook dat van jou. Je wordt uitgelogd en
+     moet je opnieuw registreren; dat eerste account wordt dan automatisch weer
+     eigenaar. Je instellingen, je zelfgemaakte <em>rangen</em> en je
+     <em>statistiektypes</em> blijven wel bestaan — die verwijder je apart bij
+     <a class="profiel-link" href="{{ url_for('admin_klassement') }}">Rangen &amp; statistieken</a>.</p>
+  <form method="post" action="{{ url_for('database_legen') }}">
+    <input type="hidden" name="omvang" value="alles">
+    <div class="rij-form">
+      <input type="text" name="bevestiging" placeholder="wis alles" autocomplete="off"
+             autocapitalize="none" spellcheck="false" required>
+      <button type="submit" class="knop gevaar">Alles wissen</button>
+    </div>
+    <p class="stil klein-tekst">Typ <code>wis alles</code> om te bevestigen.</p>
+  </form>
 </div>
 
 <h2 class="sectiekop">Rekenwerk</h2>

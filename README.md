@@ -155,6 +155,20 @@ aandacht), *Seizoenen*, *Wedstrijden*, *Toernooien*, *Spelers & teams*,
   - Stopt de eigenaar? Hij draagt het **eigenaarschap** over aan een andere
     organisator (bevestigen door `overdragen` te typen) en wordt zelf gewone
     organisator. Er is altijd exact één eigenaar.
+- **Instellingen** is enkel voor de eigenaar. Daar staan de ingrepen die de hele
+  database raken: het leaguegedeelte aan- of uitzetten, de K-factoren, back-ups,
+  en het **leegmaken** of **terugzetten** van de database. Elk van die zware
+  ingrepen vraagt een woord dat je zelf moet intypen, en maakt eerst automatisch
+  een back-up in `backups/`:
+  - *Alleen de geschiedenis wissen* (`wis geschiedenis`) — wedstrijden,
+    toernooien, seizoenen en ratings weg; spelers en teams blijven en starten
+    weer op 1000 ELO. Ideaal om een nieuw seizoen te beginnen.
+  - *Alles wissen* (`wis alles`) — ook alle spelers, teams en profielfoto's. Je
+    wordt uitgelogd; het eerste account dat zich daarna registreert is opnieuw de
+    eigenaar. Rangen en statistiektypes blijven bestaan.
+  - *Back-up terugzetten* (`terugzetten`) — kies een `.db`-bestand van je
+    computer; dat vervangt de hele database. Het bestand wordt eerst
+    gecontroleerd, dus een verkeerd bestand kan niets stukmaken.
 
 - Toernooi aanmaken: kies de datum, het aantal wedstrijden per team, hoeveel teams
   doorstoten (2, 4, 8, 16, …), het aantal potten en de duur van een wedstrijd.

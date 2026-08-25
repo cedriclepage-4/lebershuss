@@ -16,7 +16,7 @@
   <p class="stil klein-tekst">Het leaguegedeelte staat uit: spelers zien alleen het
      toernooi, geen klassement, wedstrijden, statistieken of seizoenen. Jij ziet ze
      nog wel — die pagina's zijn hieronder gemarkeerd. Aanzetten doe je met één
-     vinkje bij <a class="profiel-link" href="{{ url_for('admin_instellingen') }}#league">Instellingen</a>.</p>
+     vinkje bij {% if is_eigenaar %}<a class="profiel-link" href="{{ url_for('admin_instellingen') }}#league">Instellingen</a>{% else %}de eigenaar{% endif %}.</p>
 </div>
 {% endif %}
 
@@ -79,12 +79,15 @@
        zoals “saves”.</p>
   </a>
 
+  {% if is_eigenaar %}
   <a class="kaart tegel" href="{{ url_for('admin_instellingen') }}">
     <span class="tegel-icoon">⚙️</span>
     <h3>Instellingen</h3>
-    <p class="stil klein-tekst">K-factoren, adminwachtwoord en het herberekenen van
-       alle ratings.</p>
+    <p class="stil klein-tekst">Wat de spelers zien, K-factoren, back-ups en het
+       leegmaken of terugzetten van de database.</p>
+    <span class="pil pil-rol">👑 enkel eigenaar</span>
   </a>
+  {% endif %}
 </div>
 
 {% if lopend %}
