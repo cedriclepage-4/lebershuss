@@ -590,6 +590,92 @@ def _orden_groep(groep, bracket, shootouts, onbesliste_groepen):
     return gesorteerd
 
 
+def tiebreak_groepen(db, tid):
+    """Leg uit hoe elke gelijke stand beslist is (of nog beslist moet worden).
+
+    Bedoeld om op het scherm te tonen: wie staat er gelijk, wat deden die teams
+    onderling, en waarom staat de ene boven de andere. Geeft een lege lijst
+    zolang de bracketfase niet uitgespeeld is — dan zegt een gelijke stand nog
+    niets.
+    """
+    if not _bracketfase_gespeeld(db, tid):
+        return []
+    t = toernooi(db, tid)
+    geordend, beslissend = stand(db, tid)
+    bracket = games_van(db, tid, "bracket")
+    shootouts = games_van(db, tid, "shootout")
+    beslissende_ids = [set(x) for x in beslissend]
+    cut = t["ko_teams"]
+
+    groepen = []
+    i = 0
+    while i < len(geordend):
+        j = i
+        while j + 1 < len(geordend) and geordend[j + 1]["punten"] == geordend[i]["punten"]:
+            j += 1
+        rijen = geordend[i:j + 1]
+        i = j + 1
+        if len(rijen) < 2:
+            continue
+
+        ids = {r["team_id"] for r in rijen}
+        volledig = _volledig_onderling(bracket, ids)
+        h2h, h2h_gespeeld = _mini_punten(bracket, ids)
+        so, _ = _mini_punten(shootouts, ids)
+        so_verlies = _mini_verlies(shootouts, ids)
+
+        # De onderlinge duels zelf, zodat je kan tonen wié van wie won.
+        duels = []
+        for g in list(bracket) + list(shootouts):
+            if g["team1_id"] in ids and g["team2_id"] in ids:
+                duels.append({"fase": g["fase"], "team1": g["team1_id"],
+                              "team2": g["team2_id"], "status": g["status"],
+                              "winnaar": g["winner_team_id"],
+                              "moment": g["scheduled_at"]})
+        duels.sort(key=lambda d: (d["fase"] != "bracket", d["moment"] or ""))
+
+        raakt_ticket = any(ids & b for b in beslissende_ids)
+        wacht = any(r.get("onbeslist") for r in rijen)
+        if wacht:
+            status, uitleg = "shootout", (
+                "Deze teams staan volledig gelijk én het gaat over een ticket voor de "
+                "knockout. Een shootout beslist wie doorgaat.")
+        elif volledig and len(set(h2h.values())) > 1:
+            status, uitleg = "onderling", (
+                "Alle teams speelden onderling tegen elkaar, dus dat onderlinge "
+                "resultaat beslist.")
+        elif len(set(so.values())) > 1 or len(set(so_verlies.values())) > 1:
+            status, uitleg = "shootout_klaar", (
+                "De shootout is gespeeld; die bepaalt de volgorde.")
+        elif not volledig:
+            status, uitleg = "elo", (
+                "Deze teams speelden niet allemaal onderling tegen elkaar, dus het "
+                "onderlinge resultaat telt niet mee. Omdat "
+                "er geen ticket op het spel staat, beslist de ELO van bij de loting.")
+        else:
+            status, uitleg = "elo", (
+                "Onderling geeft dit geen uitsluitsel en er staat geen ticket op het "
+                "spel, dus de ELO van bij de loting bepaalt de volgorde.")
+
+        groepen.append({
+            "punten": rijen[0]["punten"],
+            "raakt_ticket": raakt_ticket,
+            "status": status,
+            "uitleg": uitleg,
+            "onderling_volledig": volledig,
+            "cut": cut,
+            "duels": duels,
+            "teams": [{
+                "team_id": r["team_id"], "naam": r["naam"], "positie": r["positie"],
+                "doorstoot": r["doorstoot"], "elo": r["elo"],
+                "h2h_punten": h2h[r["team_id"]], "h2h_gespeeld": h2h_gespeeld[r["team_id"]],
+                "so_punten": so[r["team_id"]], "so_verlies": so_verlies[r["team_id"]],
+                "onbeslist": r.get("onbeslist", False),
+            } for r in rijen],
+        })
+    return groepen
+
+
 # ------------------------------------------------- shootouts & doorstroming --
 
 def _bracketfase_gespeeld(db, tid):
@@ -813,13 +899,29 @@ def mag_wissen(db, game):
     return None
 
 
-def herstel_na_wissen(db, tid, fase):
-    """Breek af wat na deze fase kwam, zodat de stand opnieuw mag beslissen.
+def herstel_na_wissen(db, tid, fase, game=None):
+    """Breek af wat na deze uitslag kwam, zodat er opnieuw beslist kan worden.
 
-    Wordt een bracket- of shootoutuitslag gewist, dan klopt het knockoutschema
-    niet meer: dat wordt weggegooid en het toernooi keert terug naar de
-    bracketfase. `evalueer` bepaalt daarna opnieuw wie doorstoot.
+    Twee gevallen:
+
+    * Een **knockoutuitslag** wissen: de winnaar die al doorgeschoven was naar de
+      volgende ronde moet daar weer weg, anders blijft er een finalist staan die
+      zijn halve finale niet meer gewonnen heeft.
+    * Een **bracket- of shootoutuitslag** wissen: dan klopt het hele
+      knockoutschema niet meer. Dat wordt weggegooid en het toernooi keert terug
+      naar de bracketfase; `evalueer` bepaalt daarna opnieuw wie doorstoot.
     """
+    if fase == "knockout":
+        if game is not None and game["volgende_game_id"]:
+            kolom = "team1_id" if game["volgende_slot"] == 1 else "team2_id"
+            db.execute(f"UPDATE games SET {kolom} = NULL WHERE id = ?",
+                       (game["volgende_game_id"],))
+            # De volgende wedstrijd kan dan zelf niet meer gespeeld zijn.
+            db.execute("UPDATE games SET status = 'gepland', winner_team_id = NULL, "
+                       "played_at = NULL WHERE id = ? AND status = 'gespeeld'",
+                       (game["volgende_game_id"],))
+            db.commit()
+        return
     if fase not in ("bracket", "shootout"):
         return
     db.execute("DELETE FROM games WHERE tournament_id = ? AND fase = 'knockout'", (tid,))
@@ -833,10 +935,14 @@ def herstel_na_wissen(db, tid, fase):
 
 
 def evalueer_alles(db):
-    """Loop alle lopende toernooien na (bv. na een herberekening)."""
+    """Loop alle toernooien na (bv. na een herberekening).
+
+    Ook afgelopen toernooien: wist de organisator de finale om een fout recht te
+    zetten, dan moet het toernooi weer op 'knockout' springen. Enkel toernooien
+    die nog in opbouw zijn hebben niets te evalueren.
+    """
     meldingen = []
-    for r in db.execute("SELECT id FROM tournaments WHERE status IN "
-                        "('bracket', 'knockout')").fetchall():
+    for r in db.execute("SELECT id FROM tournaments WHERE status != 'opzet'").fetchall():
         meldingen.extend(evalueer(db, r["id"]))
     return meldingen
 

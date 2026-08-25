@@ -51,6 +51,7 @@
   {% else %}
   <button class="tab actief" data-tab="stand">Stand</button>
   {% endif %}
+  {% if tiebreaks %}<button class="tab" data-tab="gelijk">⚖️ Gelijke standen ({{ tiebreaks|length }})</button>{% endif %}
   <button class="tab" data-tab="kalender">Kalender</button>
   {% if kolommen %}<button class="tab" data-tab="knockout">Knockout</button>{% endif %}
   <button class="tab" data-tab="teams">Teams</button>
@@ -152,6 +153,80 @@
 </div>
 
 <!-- ---------------------------------------------------------- kalender -- -->
+<!-- ------------------------------------------------------- gelijke standen -- -->
+{% if tiebreaks %}
+<div data-paneel="gelijk" class="paneel verborgen">
+  <p class="stil klein-tekst">Staan teams gelijk op punten, dan beslist eerst het
+     <strong>onderlinge duel</strong>, maar enkel als alle teams uit die groep
+     onderling gespeeld hebben. Is dat niet gebeurd, en hangt er een knockoutticket van af,
+     dan volgt een <strong>shootout</strong>. Gaat het over plaatsen die er niet toe
+     doen, dan valt de keuze op de ELO van bij de loting.</p>
+
+  {% for groep in tiebreaks %}
+  <div class="kaart {{ 'conflict-kaart' if groep.status == 'shootout' }}">
+    <div class="groep-kop">
+      <h3>{{ groep.teams|length }} teams op {{ groep.punten }} punten</h3>
+      {% if groep.status == 'shootout' %}<span class="pil pil-rood">shootout beslist</span>
+      {% elif groep.status == 'onderling' %}<span class="pil pil-actief">onderling duel besliste</span>
+      {% elif groep.status == 'shootout_klaar' %}<span class="pil pil-actief">shootout gespeeld</span>
+      {% else %}<span class="pil">ELO besliste</span>{% endif %}
+      {% if groep.raakt_ticket %}<span class="pil pil-toernooi">🎟️ ticket op het spel</span>{% endif %}
+    </div>
+    <p class="klein-tekst">{{ groep.uitleg }}</p>
+
+    <table class="tabel compact">
+      <thead>
+        <tr><th>#</th><th>Team</th>
+            <th class="kol-num" title="Punten in de onderlinge duels van deze groep">Onderling</th>
+            <th class="kol-num verbergen-mobiel">Shootout</th>
+            <th class="kol-elo verbergen-mobiel">ELO bij loting</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for r in groep.teams %}
+        <tr class="{{ 'rij-door' if r.doorstoot }}">
+          <td class="kol-rang">{{ r.positie }}</td>
+          <td class="naam"><a class="profiel-link" href="{{ url_for('team_profiel', team_id=r.team_id) }}">{{ r.naam }}</a></td>
+          <td class="kol-num">
+            {%- if groep.onderling_volledig %}{{ r.h2h_punten }}
+            {%- else %}<span class="stil" title="Niet alle teams uit deze groep speelden onderling">—</span>{% endif %}</td>
+          <td class="kol-num verbergen-mobiel">
+            {%- if r.so_punten %}<span class="pil pil-actief">gewonnen</span>
+            {%- elif r.so_verlies %}<span class="pil pil-rood">verloren</span>
+            {%- elif r.onbeslist %}<span class="pil">nog te spelen</span>
+            {%- else %}<span class="stil">—</span>{% endif %}</td>
+          <td class="kol-elo verbergen-mobiel stil">{{ r.elo|elo }}</td>
+          <td>{% if r.doorstoot %}<span class="pil pil-actief">door</span>
+              {% elif r.onbeslist %}<span class="pil">nog kans</span>
+              {% else %}<span class="pil">uit</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if groep.duels %}
+    <details class="wis-blok zacht">
+      <summary>De onderlinge duels ({{ groep.duels|length }})</summary>
+      <table class="tabel compact">
+        <tbody>
+          {% for d in groep.duels %}
+          <tr>
+            <td class="stil klein-tekst">{{ 'Shootout' if d.fase == 'shootout' else 'Bracket' }}</td>
+            <td class="naam">{{ namen[d.team1] }} <span class="vs-klein">vs</span> {{ namen[d.team2] }}</td>
+            <td>{% if d.status == 'gespeeld' %}🏆 {{ namen[d.winnaar] }}
+                {% else %}<span class="stil">nog te spelen</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% else %}
+    <p class="stil klein-tekst">Deze teams speelden onderling nog niet tegen elkaar.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <div data-paneel="kalender" class="paneel verborgen">
   {% for groep in groepen %}
   <h3 class="maandkop">{{ groep.titel }}{% if groep.tijd %} · {{ groep.tijd|datum }}{% endif %}</h3>

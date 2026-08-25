@@ -212,6 +212,59 @@ if brackets:
           f"(max +{max(brackets):.1f})")
 
 # -------------------------------------------------------- oneven teams --
+# ------------------------------------------- uitslagen rechtzetten (wissen) --
+print("\n== Uitslagen wissen en opnieuw spelen ==")
+check(tm.toernooi(conn, 1)["status"] == "afgelopen", "het toernooi staat op afgelopen")
+
+# Een bracketuitslag mag niet weg zolang de knockout erop voortbouwt.
+eerste_bracket = conn.execute("SELECT * FROM games WHERE tournament_id = 1 "
+                              "AND fase = 'bracket' LIMIT 1").fetchone()
+check(tm.mag_wissen(conn, eerste_bracket) is not None,
+      "een bracketuitslag wissen wordt geweigerd zolang de knockout al gespeeld is")
+
+# De finale wissen mag wél — en dan mag het toernooi niet meer 'afgelopen' zijn.
+finale_rij = conn.execute("SELECT * FROM games WHERE tournament_id = 1 "
+                          "AND fase = 'knockout' AND ronde = 2").fetchone()
+check(tm.mag_wissen(conn, finale_rij) is None, "de finale mag gewist worden")
+conn.execute("UPDATE games SET status = 'gepland', winner_team_id = NULL, played_at = NULL "
+             "WHERE id = ?", (finale_rij["id"],))
+conn.commit()
+tm.herstel_na_wissen(conn, 1, finale_rij["fase"], finale_rij)
+shuss.herbereken_alles(conn)
+tm.evalueer_alles(conn)
+check(tm.toernooi(conn, 1)["status"] == "knockout",
+      "na het wissen van de finale springt het toernooi terug naar 'knockout'")
+opnieuw = conn.execute("SELECT * FROM games WHERE id = ?", (finale_rij["id"],)).fetchone()
+check(bool(opnieuw["team1_id"]) and bool(opnieuw["team2_id"]),
+      "de finalisten blijven staan als enkel de finale gewist wordt")
+
+# Een halve finale wissen moet de finalist die eruit voortkwam weer weghalen.
+halve_rij = conn.execute("SELECT * FROM games WHERE tournament_id = 1 AND fase = 'knockout' "
+                         "AND ronde = 4 AND status = 'gespeeld' LIMIT 1").fetchone()
+conn.execute("UPDATE games SET status = 'gepland', winner_team_id = NULL, played_at = NULL "
+             "WHERE id = ?", (halve_rij["id"],))
+conn.commit()
+tm.herstel_na_wissen(conn, 1, halve_rij["fase"], halve_rij)
+kolom = "team1_id" if halve_rij["volgende_slot"] == 1 else "team2_id"
+volgende = conn.execute("SELECT * FROM games WHERE id = ?",
+                        (halve_rij["volgende_game_id"],)).fetchone()
+check(volgende[kolom] is None,
+      "de finale verliest de winnaar van een gewiste halve finale")
+
+# En daarna moet alles gewoon opnieuw uitgespeeld kunnen worden.
+for _ in range(10):
+    nog_open = conn.execute("SELECT * FROM games WHERE tournament_id = 1 "
+                            "AND status = 'gepland' AND team1_id IS NOT NULL").fetchall()
+    if not nog_open:
+        break
+    for g in nog_open:
+        speel(g)
+    shuss.herbereken_alles(conn)
+    tm.evalueer(conn, 1)
+check(tm.toernooi(conn, 1)["status"] == "afgelopen",
+      "na het rechtzetten kan het toernooi gewoon opnieuw uitgespeeld worden")
+
+
 print("\n== Oneven aantal teams ==")
 for naam in ("Speler 25", "Speler 26"):
     conn.execute("INSERT INTO players (name) VALUES (?)", (naam,))

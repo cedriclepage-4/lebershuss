@@ -2740,13 +2740,10 @@ def wedstrijd_verwijderen(game_id):
         db.execute("UPDATE games SET status = 'gepland', winner_team_id = NULL, "
                    "played_at = NULL WHERE id = ?", (game_id,))
         db.execute("DELETE FROM game_reports WHERE game_id = ?", (game_id,))
-        if game["fase"] == "knockout" and game["volgende_game_id"]:
-            kolom = "team1_id" if game["volgende_slot"] == 1 else "team2_id"
-            db.execute(f"UPDATE games SET {kolom} = NULL WHERE id = ?",
-                       (game["volgende_game_id"],))
         db.commit()
-        # Bracket of shootout gewist? Dan is het knockoutschema niet meer geldig.
-        toernooi_motor.herstel_na_wissen(db, toernooi_id, game["fase"])
+        # Ruim op wat op deze uitslag voortbouwde (doorgeschoven winnaar, of het
+        # hele knockoutschema bij een bracket- of shootoutuitslag).
+        toernooi_motor.herstel_na_wissen(db, toernooi_id, game["fase"], game)
         for melding in na_resultaat(db):
             flash(melding, "ok")
         flash("Het resultaat is gewist; de wedstrijd staat weer open." +
@@ -3279,6 +3276,8 @@ def toernooi_detail(toernooi_id):
                            actieve_types=actieve_types,
                            namen=namen, loc_namen=loc_namen, kolommen=kolommen,
                            stand=rangschikking, beslissend=beslissend, deltas=deltas,
+                           tiebreaks=(toernooi_motor.tiebreak_groepen(db, toernooi_id)
+                                      if t["status"] != "opzet" else []),
                            winnaar=winnaar, open_shootouts=open_shootouts,
                            label=TOERNOOI_STATUS.get(t["status"], ("", ""))[0],
                            heeft_loting=t["status"] != "opzet")

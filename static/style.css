@@ -575,6 +575,11 @@ input[type="file"] { padding: 7px 10px; }
 .tegel-cijfer { margin: 8px 0 6px; font-weight: 700; color: var(--navy-donker); font-size: .95rem; }
 .aandacht-kaart { border: 1px solid #fed7aa; background: #fff7ed; }
 /* Kaart met onomkeerbare ingrepen: leegmaken, terugzetten. */
+/* Uitleg bij gelijke standen in een toernooi. */
+.groep-kop { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.groep-kop h3 { margin: 0; }
+.tabel tr.rij-door td { background: #f0fdf4; }
+
 /* Twee spelers naast elkaar kiezen (team samenstellen in het paneel). */
 .duo-keuze { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 4px; }
 .duo-keuze fieldset { flex: 1 1 260px; min-width: 0; }
