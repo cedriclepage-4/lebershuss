@@ -575,6 +575,10 @@ input[type="file"] { padding: 7px 10px; }
 .tegel-cijfer { margin: 8px 0 6px; font-weight: 700; color: var(--navy-donker); font-size: .95rem; }
 .aandacht-kaart { border: 1px solid #fed7aa; background: #fff7ed; }
 /* Kaart met onomkeerbare ingrepen: leegmaken, terugzetten. */
+/* Team dat niet gekozen kan worden (speler zit al in een ander team). */
+.keuze-vak.keuze-uit { opacity: .55; cursor: not-allowed; background: var(--fond); }
+.keuze-vak.keuze-uit strong { text-decoration: line-through; }
+
 .gevaar-kaart { border: 1px solid #fecaca; background: #fffafa; }
 .gevaar-kaart h3 { margin-top: 0; color: var(--rood); }
 .gevaar-kaart input[type="text"] { max-width: 220px; }

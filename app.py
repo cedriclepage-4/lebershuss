@@ -3338,13 +3338,25 @@ def toernooi_beheer(toernooi_id):
     gekozen = {x["id"] for x in teams}
 
     namen_sp = weergavenamen(db)
+    # Spelers die al meedoen: hun andere teams kunnen er niet meer bij, want
+    # niemand kan aan twee tafels tegelijk staan.
+    bezet = {}
+    for x in teams:
+        bezet[x["player1_id"]] = x["naam"]
+        bezet[x["player2_id"]] = x["naam"]
+
     beschikbaar = []
     for r in db.execute("SELECT * FROM teams WHERE status = 'actief' ORDER BY elo DESC"):
         if r["id"] in gekozen:
             continue
+        botsing = next((pid for pid in (r["player1_id"], r["player2_id"])
+                        if pid in bezet), None)
         beschikbaar.append({"id": r["id"], "naam": r["name"], "elo": r["elo"],
                             "spelers": f'{namen_sp.get(r["player1_id"], "?")} & '
-                                       f'{namen_sp.get(r["player2_id"], "?")}'})
+                                       f'{namen_sp.get(r["player2_id"], "?")}',
+                            "botsing": (f"{namen_sp.get(botsing, 'een speler')} speelt "
+                                        f"al voor “{bezet[botsing]}”")
+                                       if botsing is not None else None})
 
     openstaand = db.execute("""
         SELECT * FROM games WHERE tournament_id = ? AND status = 'gepland'
@@ -3415,25 +3427,50 @@ def toernooi_teams(toernooi_id):
         flash("Het toernooi is al geloot; je kan de deelnemers niet meer wijzigen.", "fout")
         return redirect(url_for("toernooi_beheer", toernooi_id=toernooi_id))
 
-    toegevoegd = 0
+    # Wie doet er al mee? Een speler kan niet in twee teams tegelijk spelen —
+    # hij zou dan op hetzelfde moment aan twee tafels moeten staan.
+    bezet = {}
+    for r in db.execute("""
+        SELECT t.name, t.player1_id, t.player2_id
+        FROM tournament_teams tt JOIN teams t ON t.id = tt.team_id
+        WHERE tt.tournament_id = ?
+    """, (toernooi_id,)):
+        bezet[r["player1_id"]] = r["name"]
+        bezet[r["player2_id"]] = r["name"]
+    namen_sp = weergavenamen(db)
+
+    toegevoegd, geweigerd = 0, []
     for waarde in request.form.getlist("team"):
         try:
             team_id = int(waarde)
         except ValueError:
             continue
-        bestaat = db.execute("SELECT 1 FROM teams WHERE id = ? AND status = 'actief'",
-                             (team_id,)).fetchone()
-        if not bestaat:
+        team = db.execute("SELECT * FROM teams WHERE id = ? AND status = 'actief'",
+                          (team_id,)).fetchone()
+        if not team:
+            continue
+        botsing = next((pid for pid in (team["player1_id"], team["player2_id"])
+                        if pid in bezet), None)
+        if botsing is not None:
+            geweigerd.append(f"“{team['name']}” niet: {namen_sp.get(botsing, 'een speler')} "
+                             f"speelt al voor “{bezet[botsing]}”")
             continue
         try:
             db.execute("INSERT INTO tournament_teams (tournament_id, team_id) "
                        "VALUES (?, ?)", (toernooi_id, team_id))
             toegevoegd += 1
+            bezet[team["player1_id"]] = team["name"]
+            bezet[team["player2_id"]] = team["name"]
         except Exception:
             pass
     db.commit()
-    flash(f"{toegevoegd} team(s) toegevoegd aan het toernooi." if toegevoegd
-          else "Er zijn geen teams toegevoegd.", "ok" if toegevoegd else "fout")
+    if toegevoegd:
+        flash(f"{toegevoegd} team(s) toegevoegd aan het toernooi.", "ok")
+    if geweigerd:
+        flash("Elke speler kan maar voor één team per toernooi spelen. "
+              + "; ".join(geweigerd) + ".", "fout")
+    elif not toegevoegd:
+        flash("Er zijn geen teams toegevoegd.", "fout")
     return redirect(url_for("toernooi_beheer", toernooi_id=toernooi_id))
 
 

@@ -58,11 +58,13 @@
   <form method="post" action="{{ url_for('toernooi_teams', toernooi_id=t['id']) }}">
     <div class="keuze-raster">
       {% for team in beschikbaar %}
-      <label class="keuze-vak">
-        <input type="checkbox" name="team" value="{{ team.id }}">
+      <label class="keuze-vak {{ 'keuze-uit' if team.botsing }}"
+             {% if team.botsing %}title="{{ team.botsing }}"{% endif %}>
+        <input type="checkbox" name="team" value="{{ team.id }}" {{ 'disabled' if team.botsing }}>
         <span>
           <strong>{{ team.naam }}</strong>
           <span class="klein-tekst stil">{{ team.spelers }} · {{ team.elo|elo }} ELO</span>
+          {% if team.botsing %}<span class="klein-tekst conflict-tekst">⚠️ {{ team.botsing }}</span>{% endif %}
         </span>
       </label>
       {% endfor %}
