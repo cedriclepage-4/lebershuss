@@ -47,14 +47,31 @@ KO_LABEL = {2: "Finale", 4: "Halve finale", 8: "Kwartfinale",
             16: "Achtste finale", 32: "Zestiende finale"}
 
 
-def fase_factor(fase: str, ronde=None) -> float:
-    """Gewicht van een wedstrijd voor de permanente ELO."""
+# In de knockout weegt een nederlaag maar half zo zwaar als een overwinning.
+#
+# Waarom? Met een oplopend gewicht (kwart 1,5 → finale 2,0) betaalde je vroeger
+# meer voor een late nederlaag dan je verdiende met de winst die je er bracht:
+# de kwartfinale verliezen kostte 24 punten, terwijl je je helemaal niet
+# plaatsen niets kostte. Wie verder geraakte, kon daar dus ELO op verliezen.
+# Door de nederlaag te halveren wordt elke ronde die je overleeft ook echt
+# beloond. De keerzijde: er komt een beetje ELO bij in omloop.
+KO_VERLIES = 0.50
+
+
+def fase_factor(fase: str, ronde=None, verloren: bool = False) -> float:
+    """Gewicht van een wedstrijd voor de permanente ELO.
+
+    `verloren=True` geeft het gewicht voor de verliezende kant; in de knockout
+    is dat de helft. In alle andere fases wegen winst en verlies even zwaar,
+    zodat de ELO daar een zuiver nulsomspel blijft.
+    """
     if fase == "knockout":
         try:
             n = int(ronde)
         except (TypeError, ValueError):
-            return 1.25
-        return KO_FACTOR.get(n, 1.25)
+            n = None
+        f = KO_FACTOR.get(n, 1.25)
+        return f * KO_VERLIES if verloren else f
     return FASE_FACTOR.get(fase, 1.0)
 
 
@@ -88,15 +105,23 @@ def effectieve_rating(eigen: float, maat: float, team_elo: float) -> float:
 def proces_wedstrijd(spelers1: dict, spelers2: dict,
                      team1_elo: float, team2_elo: float,
                      winnaar: int, k_speler: float = 32.0,
-                     k_team: float = 32.0):
+                     k_team: float = 32.0, verlies_deel: float = 1.0):
     """
     Verwerk één wedstrijd.
 
     spelers1 / spelers2 : dict {speler_id: elo} met telkens exact 2 spelers
     winnaar             : 1 als team 1 wint, 2 als team 2 wint (gelijkspel bestaat niet)
+    verlies_deel        : hoeveel van de puntenafname de verliezer betaalt.
+                          1,0 = een zuiver nulsomspel (wat de winnaar wint,
+                          verliest de tegenstander). In de knockout staat dit op
+                          0,5, zodat ver geraken nooit ELO kost.
 
     Geeft terug: (nieuwe_speler_elos: dict {id: elo}, nieuw_team1_elo, nieuw_team2_elo)
     """
+    def weeg(delta):
+        """De verliezer (negatieve delta) betaalt eventueel maar een deel."""
+        return delta * verlies_deel if delta < 0 else delta
+
     if winnaar not in (1, 2):
         raise ValueError("winnaar moet 1 of 2 zijn")
     if len(spelers1) != 2 or len(spelers2) != 2:
@@ -108,8 +133,8 @@ def proces_wedstrijd(spelers1: dict, spelers2: dict,
     s1 = 1.0 if winnaar == 1 else 0.0
     s2 = 1.0 - s1
 
-    nieuw_team1 = team1_elo + k_team * (s1 - verwacht(zijde1, zijde2))
-    nieuw_team2 = team2_elo + k_team * (s2 - verwacht(zijde2, zijde1))
+    nieuw_team1 = team1_elo + weeg(k_team * (s1 - verwacht(zijde1, zijde2)))
+    nieuw_team2 = team2_elo + weeg(k_team * (s2 - verwacht(zijde2, zijde1)))
 
     nieuwe_spelers = {}
     for eigen_dict, andere_zijde, score, eigen_team_elo in (
@@ -119,6 +144,7 @@ def proces_wedstrijd(spelers1: dict, spelers2: dict,
         for pid in eigen_dict:
             maat_elo = next(v for k, v in eigen_dict.items() if k != pid)
             eff = effectieve_rating(eigen_dict[pid], maat_elo, eigen_team_elo)
-            nieuwe_spelers[pid] = eigen_dict[pid] + k_speler * (score - verwacht(eff, andere_zijde))
+            nieuwe_spelers[pid] = eigen_dict[pid] + weeg(
+                k_speler * (score - verwacht(eff, andere_zijde)))
 
     return nieuwe_spelers, nieuw_team1, nieuw_team2

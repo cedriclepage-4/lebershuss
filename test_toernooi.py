@@ -135,13 +135,28 @@ def speel(game, winnaar=None):
     conn.commit()
 
 
+def _shootouts_beslissen_iets():
+    """Elke geplande shootout moet de groep doorstoters kunnen veranderen.
+
+    Anders laat je mensen een wedstrijd spelen die er niet toe doet. "Kunnen"
+    telt hier over álle uitslagen van de andere openstaande shootouts heen: een
+    wedstrijd die vandaag nog niets beslist maar dat straks wél kan, blijft
+    terecht staan. Enkel wie onder géén enkele combinatie iets verandert, hoort
+    weg te zijn — en dat is precies wat de opruimstap doet.
+    """
+    return not tm._wis_zinloze_shootouts(conn, 1)
+
+
 ronde = 0
+zinloos = 0
 while True:
     open_games = conn.execute(
         "SELECT * FROM games WHERE tournament_id = 1 AND status = 'gepland' "
         "AND team1_id IS NOT NULL ORDER BY scheduled_at, id").fetchall()
     if not open_games:
         break
+    if not _shootouts_beslissen_iets():
+        zinloos += 1
     for g in open_games:
         speel(g)
     shuss.herbereken_alles(conn)
@@ -155,6 +170,7 @@ while True:
 
 t = tm.toernooi(conn, 1)
 check(t["status"] == "afgelopen", f"toernooi afgelopen (status: {t['status']})")
+check(zinloos == 0, "er wordt nooit een shootout ingepland die niets beslist")
 
 geordend, beslissend = tm.stand(conn, 1)
 check(not beslissend, "geen onbesliste plaatsen meer")
@@ -182,7 +198,28 @@ check({finale["team1_id"], finale["team2_id"]} ==
 print("\n== ELO-controle ==")
 shuss.herbereken_alles(conn)
 elos = [r[0] for r in conn.execute("SELECT elo FROM players")]
-check(abs(sum(elos) - 24 * 1000) < 1e-6, "permanente ELO blijft een nulsomspel")
+
+# Nulsom per wedstrijd: wat de ene wint, verliest de andere — behalve in de
+# knockout, waar de verliezer maar de helft betaalt (zie KO_VERLIES in elo.py).
+saldi = {}
+for r in conn.execute("""
+    SELECT g.id, g.fase, SUM(rh.elo_na - rh.elo_voor) AS saldo
+    FROM rating_history rh JOIN games g ON g.id = rh.game_id
+    WHERE rh.entity_type = 'speler' AND rh.scope = 'permanent'
+    GROUP BY g.id
+"""):
+    saldi.setdefault(r["fase"], []).append(r["saldo"])
+
+for fase in ("liga", "bracket"):
+    check(all(abs(s) < 1e-9 for s in saldi.get(fase, [])),
+          f"{fase}: wat de winnaar wint, verliest de verliezer (nulsom)")
+check(saldi.get("knockout") and all(s > 0 for s in saldi["knockout"]),
+      "knockout: de verliezer betaalt maar de helft, dus er komt ELO bij")
+check(sum(elos) > 24 * 1000,
+      "de totale ELO stijgt daardoor met precies de knockoutbonus")
+bonus = sum(saldi.get("knockout", []))
+check(abs(sum(elos) - 24 * 1000 - bonus) < 1e-6,
+      "en die stijging is exact de som van de knockoutwedstrijden")
 
 sr2 = {r["entity_id"]: r["elo"] for r in conn.execute(
     "SELECT entity_id, elo FROM season_ratings WHERE entity_type = 'speler'")}
@@ -264,6 +301,112 @@ for _ in range(10):
 check(tm.toernooi(conn, 1)["status"] == "afgelopen",
       "na het rechtzetten kan het toernooi gewoon opnieuw uitgespeeld worden")
 
+
+
+# ------------------------------------------------- tiebreak zonder ELO-verschil --
+print("\n== Tiebreak wanneer iedereen op 1000 begint ==")
+# Zelfde ELO voor iedereen: de volgorde mag niet op de naam berusten.
+conn.execute("UPDATE teams SET elo = 1000")
+conn.commit()
+namen_orde = [r["naam"] for r in tm.stand(conn, 1)[0]]
+check(namen_orde != sorted(namen_orde),
+      "de stand is niet zomaar alfabetisch wanneer alle ELO's gelijk zijn")
+
+# De kwaliteit van de overwinningen (punten van wie je klopte) moet de teams
+# scheiden, en mag NIET afhangen van het moment waarop je iemand trof.
+geordend_nu, _ = tm.stand(conn, 1)
+punten_van = {r["team_id"]: r["punten"] for r in geordend_nu}
+kwaliteit, programma = tm.winstkwaliteit(conn, 1, punten_van)
+check(len(set(kwaliteit.values())) > 1,
+      "de kwaliteit van de overwinningen verschilt tussen de teams")
+for r in geordend_nu:
+    verwacht_kw = sum(punten_van[g["team2_id"] if g["winner_team_id"] == g["team1_id"]
+                                 else g["team1_id"]]
+                      for g in conn.execute(
+                          "SELECT * FROM games WHERE tournament_id = 1 AND fase = 'bracket' "
+                          "AND status = 'gespeeld' AND winner_team_id = ?", (r["team_id"],)))
+    if r["kwaliteit"] != verwacht_kw:
+        check(False, f"kwaliteit klopt niet voor {r['naam']}")
+        break
+else:
+    check(True, "kwaliteit = som van de punten van de verslagen teams")
+
+# De toernooikracht (gewonnen/verloren ELO tijdens de bracketfase) moet
+# verschillen, ook al start iedereen op dezelfde rating.
+kracht = tm.elo_na_bracketfase(conn, 1)
+check(len(set(round(v, 6) for v in kracht.values())) > 1,
+      "de toernooikracht scheidt teams die op punten gelijk staan")
+check(abs(sum(kracht.values())) < 1e-6,
+      "de toernooikracht is een nulsom: iedereen begint vanavond op 0")
+
+# Knockoutwedstrijden mogen de bracketstand niet meer verschuiven.
+voor = [r["team_id"] for r in tm.stand(conn, 1)[0]]
+shuss.herbereken_alles(conn)
+tm.evalueer_alles(conn)
+na = [r["team_id"] for r in tm.stand(conn, 1)[0]]
+check(voor == na, "de bracketstand blijft identiek na een herberekening")
+
+# De potindeling mag niet alfabetisch zijn bij gelijke ELO.
+verdelingen = set()
+for zaad in range(4):
+    teams_lijst = [dict(id=i, naam=f"Team {chr(65+i)}", elo=1000.0) for i in range(12)]
+    verdelingen.add(tuple(sorted(tm.potten_verdelen(
+        teams_lijst, 4, random.Random(zaad)).items())))
+check(len(verdelingen) > 1,
+      "de potindeling verschilt per loting wanneer alle teams even sterk zijn")
+
+
+# ---------------------------------------------- shootouts die in een kring draaien --
+print("\n== Kringetje bij shootouts ==")
+
+
+def _nep(gid, a, b, w):
+    return {"id": gid, "team1_id": a, "team2_id": b, "winner_team_id": w,
+            "status": "gespeeld", "fase": "shootout",
+            "scheduled_at": f"2026-09-04T2{gid}:00"}
+
+
+drie = [{"team_id": i, "naam": f"T{i}", "elo": 1000.0, "kracht": 1.0 - i} for i in (1, 2, 3)]
+
+# Nog niets gespeeld: er moet wél een shootoutronde komen.
+nodig = []
+tm._orden_groep([dict(r) for r in drie], [], [], nodig, 1)
+check(len(nodig) == 1, "drie gelijke teams krijgen een shootoutronde")
+
+# A klopt B, B klopt C, C klopt A: iedereen 1 winst, 1 verlies.
+kringetje = [_nep(1, 1, 2, 1), _nep(2, 2, 3, 2), _nep(3, 3, 1, 3)]
+nodig = []
+volgorde = tm._orden_groep([dict(r) for r in drie], [], kringetje, nodig, 1)
+check(not nodig, "na een kringetje wordt er GEEN nieuwe shootoutronde gepland")
+check([r["team_id"] for r in volgorde] == [1, 2, 3],
+      "een kringetje wordt op toernooikracht beslist")
+
+# Eén gespeelde shootout is genoeg: ook als de teams daarna nog gelijk staan,
+# komt er geen tweede ronde. Zo weet de zaal bij de start hoeveel er komen.
+half = [_nep(1, 1, 2, 1), _nep(2, 3, 1, 3)]        # 2 en 3 speelden niet onderling
+nodig = []
+tm._orden_groep([dict(r) for r in drie], [], half, nodig, 1)
+check(not nodig, "wie zijn shootout speelde, krijgt er geen tweede")
+
+# Een gewone uitslag (geen kring) blijft gewoon werken.
+beslist = [_nep(1, 1, 2, 1), _nep(2, 1, 3, 1), _nep(3, 2, 3, 2)]
+nodig = []
+tm._orden_groep([dict(r) for r in drie], [], beslist, nodig, 1)
+check(not nodig, "een shootoutronde met een duidelijke winnaar is meteen klaar")
+
+# Groep van vier: één ronde, en daarna beslist de toernooikracht. Vroeger
+# speelden de winnaars nog onderling verder; dat gaf onaangekondigde extra
+# rondes en is nu bewust afgeschaft.
+vier = [{"team_id": i, "naam": f"T{i}", "elo": 1000.0, "kracht": -i} for i in (1, 2, 3, 4)]
+nodig = []
+tm._orden_groep([dict(r) for r in vier], [], [], nodig, 1)
+check(len(nodig) == 1, "vier gelijke teams krijgen één shootoutronde")
+nodig = []
+volgorde = tm._orden_groep([dict(r) for r in vier], [],
+                           [_nep(1, 1, 2, 1), _nep(2, 3, 4, 3)], nodig, 1)
+check(not nodig, "na die ene ronde komt er geen tweede, ook niet voor de winnaars")
+check([r["team_id"] for r in volgorde][:2] == [1, 3],
+      "de winnaars staan bovenaan, onderling geordend op toernooikracht")
 
 print("\n== Oneven aantal teams ==")
 for naam in ("Speler 25", "Speler 26"):

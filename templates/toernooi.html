@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_inzet.html" import inzet_pillen %}
 {% block titel %}{{ t['name'] }}{% endblock %}
 {% block inhoud %}
 
@@ -106,13 +107,14 @@
   <div class="kaart">
     <h3>Bracketfase</h3>
     {% if open_shootouts %}
-    <p class="shootout-melding">⚡ <strong>{{ open_shootouts }} shootout(s) nodig.</strong>
-       Deze teams staan gelijk en het onderlinge duel
-       gaf geen uitsluitsel.</p>
+    <p class="shootout-melding">⚡ <strong>Nog maximaal {{ open_shootouts }} shootout(s).</strong>
+       Deze teams staan gelijk en het onderlinge duel gaf geen uitsluitsel.
+       Ligt onderweg al vast wie doorstoot, dan vallen de overige weg.</p>
     {% endif %}
     <p class="klein-tekst stil">Winst = 3 punten. De bovenste {{ t['ko_teams'] }} teams gaan door
-      naar de knockout. Staan teams gelijk, dan telt het onderlinge duel. Indien dit niet gespeeld is,
-      volgt er een shootout tussen alle betrokken teams. Een shootout beslist enkel wie
+      naar de knockout. Staan teams gelijk, dan telt het onderlinge duel. Indien dit niet
+      gespeeld is, volgt er één ronde shootouts tussen de betrokken teams. Blijft het
+      daarna gelijk, dan beslist de toernooikracht. Een shootout bepaalt enkel wie
       doorstoot en telt niet mee voor de ELO.</p>
     <table class="tabel">
       <thead>
@@ -158,9 +160,19 @@
 <div data-paneel="gelijk" class="paneel verborgen">
   <p class="stil klein-tekst">Staan teams gelijk op punten, dan beslist eerst het
      <strong>onderlinge duel</strong>, maar enkel als alle teams uit die groep
-     onderling gespeeld hebben. Is dat niet gebeurd, en hangt er een knockoutticket van af,
-     dan volgt een <strong>shootout</strong>. Gaat het over plaatsen die er niet toe
-     doen, dan valt de keuze op de ELO van bij de loting.</p>
+     onderling gespeeld hebben. Daarna telt de <strong>kwaliteit</strong> van je
+     overwinningen: de punten van de teams die je versloeg. Staat ook dat gelijk,
+     dan je hele <strong>programma</strong> — de punten van al je tegenstanders.</p>
+  <p class="stil klein-tekst">Valt het dan nog niet te scheiden én hangt er een
+     knockoutticket van af, dan volgt <strong>één ronde shootouts</strong> tussen de
+     teams rond de streep: precies zoveel partijen als er plaatsen te verdelen zijn,
+     telkens winnaar door en verliezer eruit, allemaal tegelijk op verschillende
+     tafels. Wie hoe dan ook boven of onder de streep eindigt, hoeft niet te spelen.
+     Gaat het over plaatsen die er niet toe doen, dan beslist de
+     <strong>toernooikracht</strong> en anders de loting.</p>
+  <p class="stil klein-tekst">Bij de shootouts die nog moeten komen staat erbij wat
+     er op het spel staat: of een nederlaag je meteen uitschakelt, of een zege je
+     zeker doet doorstoten. Zo kom je daar niet pas achteraf achter.</p>
 
   {% for groep in tiebreaks %}
   <div class="kaart {{ 'conflict-kaart' if groep.status == 'shootout' }}">
@@ -168,8 +180,12 @@
       <h3>{{ groep.teams|length }} teams op {{ groep.punten }} punten</h3>
       {% if groep.status == 'shootout' %}<span class="pil pil-rood">shootout beslist</span>
       {% elif groep.status == 'onderling' %}<span class="pil pil-actief">onderling duel besliste</span>
-      {% elif groep.status == 'shootout_klaar' %}<span class="pil pil-actief">shootout gespeeld</span>
-      {% else %}<span class="pil">ELO besliste</span>{% endif %}
+      {% elif groep.status == 'shootout_bezig' %}<span class="pil pil-rood">⏳ shootout bezig</span>
+      {% elif groep.status == 'shootout_klaar' %}<span class="pil pil-actief">shootout besliste</span>
+      {% elif groep.status == 'kwaliteit' %}<span class="pil">kwaliteit besliste</span>
+      {% elif groep.status == 'programma' %}<span class="pil">programma besliste</span>
+      {% elif groep.status == 'kringetje' %}<span class="pil pil-rol">🔄 gelijkspel — toernooikracht besliste</span>
+      {% else %}<span class="pil">toernooikracht besliste</span>{% endif %}
       {% if groep.raakt_ticket %}<span class="pil pil-toernooi">🎟️ ticket op het spel</span>{% endif %}
     </div>
     <p class="klein-tekst">{{ groep.uitleg }}</p>
@@ -179,7 +195,11 @@
         <tr><th>#</th><th>Team</th>
             <th class="kol-num" title="Punten in de onderlinge duels van deze groep">Onderling</th>
             <th class="kol-num verbergen-mobiel">Shootout</th>
-            <th class="kol-elo verbergen-mobiel">ELO bij loting</th><th></th></tr>
+            <th class="kol-num verbergen-mobiel" title="Som van de punten van de teams die dit team versloeg">Kwaliteit</th>
+            <th class="kol-num verbergen-mobiel" title="Som van de punten van álle tegenstanders die dit team trof">Programma</th>
+            {% if groep.kracht_beslist %}
+            <th class="kol-num" title="De ELO die dit team vanavond won of verloor">Kracht</th>
+            {% endif %}<th></th></tr>
       </thead>
       <tbody>
         {% for r in groep.teams %}
@@ -189,19 +209,41 @@
           <td class="kol-num">
             {%- if groep.onderling_volledig %}{{ r.h2h_punten }}
             {%- else %}<span class="stil" title="Niet alle teams uit deze groep speelden onderling">—</span>{% endif %}</td>
-          <td class="kol-num verbergen-mobiel">
-            {%- if r.so_punten %}<span class="pil pil-actief">gewonnen</span>
-            {%- elif r.so_verlies %}<span class="pil pil-rood">verloren</span>
+          <td class="verbergen-mobiel">
+            {%- if r.so_vorm %}
+            <span class="so-vorm" title="{{ r.so_winst }} gewonnen, {{ r.so_vorm|length - r.so_winst }} verloren of nog te spelen">
+              {%- for v in r.so_vorm %}<span class="vorm-bol vorm-{{ v }}">{{ v if v != '?' else '·' }}</span>{% endfor -%}
+            </span>
             {%- elif r.onbeslist %}<span class="pil">nog te spelen</span>
             {%- else %}<span class="stil">—</span>{% endif %}</td>
-          <td class="kol-elo verbergen-mobiel stil">{{ r.elo|elo }}</td>
-          <td>{% if r.doorstoot %}<span class="pil pil-actief">door</span>
-              {% elif r.onbeslist %}<span class="pil">nog kans</span>
+          <td class="kol-num verbergen-mobiel"><strong>{{ r.kwaliteit }}</strong></td>
+          <td class="kol-num verbergen-mobiel stil">{{ r.programma }}</td>
+          {% if groep.kracht_beslist %}
+          <td class="kol-num"><strong>{{ r.kracht|kracht }}</strong></td>
+          {% endif %}
+          <td>{% if r.onbeslist or r.voorlopig %}<span class="pil">nog kans</span>
+              {% elif r.doorstoot %}<span class="pil pil-actief">door</span>
               {% else %}<span class="pil">uit</span>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+
+    {% set open_duels = groep.duels | selectattr('fase', 'equalto', 'shootout')
+                                    | rejectattr('status', 'equalto', 'gespeeld') | list %}
+    {% if open_duels %}
+    <div class="inzet-blok">
+      <h4>Op het programma ({{ open_duels|length }})</h4>
+      <ol class="inzet-lijst">
+        {% for d in open_duels %}
+        <li>
+          <span class="naam">{{ namen[d.team1] }} <span class="vs-klein">vs</span> {{ namen[d.team2] }}</span>
+          {{ inzet_pillen(d.uit_bij_verlies, d.door_bij_winst, namen) }}
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+    {% endif %}
 
     {% if groep.duels %}
     <details class="wis-blok zacht">

@@ -258,6 +258,29 @@ Zo weegt alles mee: je eigen niveau, je maat, je team en de sterkte van de
 tegenstand. Winnen tegen een topduo levert veel punten op; verliezen van de
 rode lantaarn kost er veel.
 
+**Gewicht per fase.** Een leaguewedstrijd telt voor 1, de bracketfase van een
+toernooi voor 0,75, en in de knockout loopt het op: achtste ×1,25, kwart ×1,5,
+halve ×1,75, finale ×2. Een shootout telt helemaal niet mee.
+
+**In de knockout betaalt de verliezer maar de helft.** Zonder die regel kostte
+ver geraken je ELO: je kwartfinale verliezen kostte 24 punten terwijl je je
+helemaal niet plaatsen niets kostte, en een late nederlaag woog zwaarder dan de
+overwinning die je er bracht. Nu levert elke ronde die je overleeft ook echt
+iets op:
+
+| verloop | ELO |
+| --- | --- |
+| net niet gekwalificeerd | 0 |
+| uit in de kwartfinale | −12 |
+| kwart gewonnen, uit in de halve | +9 |
+| tot de finale, daar verloren | +32 |
+| toernooi gewonnen | +78 |
+
+De keerzijde: in de knockout is de ELO geen zuiver nulsomspel meer — er komt per
+toernooi wat ELO bij in omloop (± 90 punten, verspreid over alle deelnemers).
+In de league en de bracketfase blijft het wél een nulsom: wat de ene wint,
+verliest de andere.
+
 ## Bestanden
 
 | Bestand | Rol |

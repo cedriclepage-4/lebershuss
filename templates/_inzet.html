@@ -1,0 +1,22 @@
+{# Wat staat er op het spel bij een shootout die nog gespeeld moet worden?
+   Staat het voor beide ploegen vast, dan is één zin duidelijker dan twee. #}
+{% macro inzet_pillen(uit, door, namen) %}
+  {%- if uit|length == 2 and door|length == 2 -%}
+    <span class="pil pil-rood">🎟️ de winnaar is door, de verliezer ligt eruit</span>
+  {%- else -%}
+    {%- if uit|length == 2 -%}
+      <span class="pil pil-rood">❌ de verliezer ligt eruit</span>
+    {%- else -%}
+      {%- for team_id in uit -%}
+      <span class="pil pil-rood">❌ {{ namen[team_id] }} ligt eruit bij verlies</span>
+      {%- endfor -%}
+    {%- endif -%}
+    {%- if door|length == 2 -%}
+      <span class="pil pil-actief">✅ de winnaar is zeker door</span>
+    {%- else -%}
+      {%- for team_id in door -%}
+      <span class="pil pil-actief">✅ {{ namen[team_id] }} is zeker door bij winst</span>
+      {%- endfor -%}
+    {%- endif -%}
+  {%- endif -%}
+{% endmacro %}

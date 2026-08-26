@@ -102,6 +102,25 @@ body {
 .tabel td { padding: 10px; border-bottom: 1px solid var(--lijn); }
 .tabel tbody tr:hover { background: #fdf8ee; }
 .tabel.compact th, .tabel.compact td { padding: 6px 8px; }
+
+/* Lange lijsten in een venster met vaste hoogte, zodat het beheerscherm niet
+   eindeloos lang wordt bij honderd spelers. De kop blijft staan bij het
+   scrollen; hij heeft een eigen achtergrond nodig, anders schuiven de rijen
+   eronder door. */
+.tabel-venster {
+  max-height: 26rem; overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid var(--lijn); border-radius: 12px;
+}
+.tabel-venster > .tabel { margin: 0; }
+.tabel-venster > .tabel th {
+  position: sticky; top: 0; z-index: 1; background: var(--kaart, #fff);
+  box-shadow: inset 0 -2px 0 var(--lijn);
+  border-bottom: 0;                     /* de schaduw tekent de lijn nu */
+}
+.tabel-venster > .tabel tr:last-child td { border-bottom: 0; }
+/* Naamveld + knop naast elkaar in een tabelcel: geen marge, niet afbreken. */
+.rij-form.nauw { flex-wrap: nowrap; gap: 6px; margin-bottom: 0; }
+.rij-form.nauw input[type="text"] { min-width: 8rem; }
 .kol-rang { width: 44px; text-align: center; }
 td.kol-rang { font-weight: 600; }
 .kol-num, .kol-elo { text-align: right; width: 90px; }
@@ -356,6 +375,11 @@ input[type="color"] { width: 46px; height: 40px; padding: 2px; border: 1px solid
   /* namen mogen wél afbreken, anders wordt de tabel onnodig breed */
   .tabel td.naam, .tabel td.wikkel, .tabel th.wikkel { white-space: normal; }
   .kol-pct { width: auto; }
+  /* Zit de tabel al in een venster, dan schuift dát venster in beide
+     richtingen. De tabel zelf blijft een tabel, anders werkt de vastgezette
+     kop niet meer. */
+  .tabel-venster { overflow: auto; }
+  .tabel-venster > .tabel { display: table; }
 }
 
 
@@ -503,6 +527,17 @@ input[type="file"] { padding: 7px 10px; }
 }
 .vorm-W { background: var(--groen); }
 .vorm-V { background: var(--rood); }
+/* Nog te spelen: leeg bolletje, zodat je ziet dat er nog iets aankomt. */
+.vorm-\? { background: transparent; border: 2px dashed var(--lijn); color: var(--stil); }
+.so-vorm { white-space: nowrap; }
+
+/* Wat staat er op het spel bij de shootouts die nog moeten komen? */
+.inzet-blok { margin-top: 14px; }
+.inzet-blok h4 { margin: 0 0 8px; font-size: .9rem; }
+.inzet-lijst { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.inzet-lijst li { line-height: 1.7; }
+.inzet-lijst .naam { margin-right: 8px; }
+.inzet-regel { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .shootout-melding {
   background: #fff7ed; border: 1px solid #fed7aa; color: #7c2d12;
   border-radius: 10px; padding: 10px 14px; font-size: .92rem; margin: 4px 0 12px;

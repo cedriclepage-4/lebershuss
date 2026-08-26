@@ -23,6 +23,7 @@ per ronde spelen er nooit meer wedstrijden tegelijk dan er tafels zijn, en een
 team staat nooit op twee tafels tegelijk.
 """
 
+import hashlib
 import math
 import random
 from datetime import datetime, timedelta
@@ -94,14 +95,36 @@ def seed_volgorde(n):
     return orde
 
 
-def potten_verdelen(teams, aantal_potten):
+def lot_sleutel(tid, team_id):
+    """Een vaste, willekeurig ogende waarde per team binnen één toernooi.
+
+    Nodig om teams te ordenen die écht niet van elkaar te onderscheiden zijn —
+    bijvoorbeeld op een eerste toernooi, wanneer iedereen nog op 1000 ELO staat.
+    Zonder dit zou de alfabetische naam beslissen: “Team A” zou dan altijd boven
+    “Team Z” eindigen, wat systematisch oneerlijk is.
+
+    Het is met opzet gebaseerd op het toernooinummer én het teamnummer: dezelfde
+    volgorde bij elke herberekening (anders zou de stand blijven verspringen),
+    maar een andere volgorde in een volgend toernooi.
+    """
+    ruw = hashlib.sha1(f"{tid}:{team_id}".encode()).hexdigest()
+    return int(ruw[:12], 16)
+
+
+def potten_verdelen(teams, aantal_potten, rng=None):
     """Verdeel de teams (gesorteerd op permanente ELO) over de potten.
 
-    Geeft {team_id: potnummer} terug; pot 1 bevat de sterkste teams.
+    Geeft {team_id: potnummer} terug; pot 1 bevat de sterkste teams. Teams met
+    exact dezelfde ELO worden door elkaar geschud: op een eerste toernooi staat
+    iedereen op 1000, en dan mag de alfabetische volgorde niet bepalen wie in
+    welke pot belandt.
     """
     n = len(teams)
     aantal_potten = max(1, min(aantal_potten, n))
-    gesorteerd = sorted(teams, key=lambda t: (-t["elo"], t["naam"]))
+    teams = list(teams)
+    if rng is not None:
+        rng.shuffle(teams)          # sorted() is stabiel: gelijke ELO blijft geschud
+    gesorteerd = sorted(teams, key=lambda t: -t["elo"])
     basis, rest = divmod(n, aantal_potten)
     pot_van = {}
     i = 0
@@ -365,7 +388,7 @@ def genereer(db, tid, rng=None):
 
     t = toernooi(db, tid)
     teams = deelnemers(db, tid)
-    pot_van = potten_verdelen(teams, t["potten"])
+    pot_van = potten_verdelen(teams, t["potten"], rng)
     rng = rng or random.Random()
 
     try:
@@ -422,6 +445,68 @@ def herloot(db, tid):
 
 # ------------------------------------------------------------------ stand --
 
+def winstkwaliteit(db, tid, punten_van):
+    """Hoe sterk waren de teams die je klopte, en die je tegenkwam?
+
+    Twee klassieke maatstaven uit het schaken, hier berekend op de eindstand van
+    de bracketfase:
+
+    * **kwaliteit** (Sonneborn-Berger): de som van de punten van de teams die je
+      versloeg. Klopte je de nummers 1 en 2, dan staat daar veel; klopte je twee
+      hekkensluiters, dan weinig.
+    * **programma** (Buchholz): de som van de punten van álle tegenstanders die
+      je trof, gewonnen of verloren. Dat zegt hoe zwaar je lotingsprogramma was.
+
+    Allebei worden ze pas ná de bracketfase berekend, uit de eindpunten. Het
+    moment waarop je iemand versloeg speelt dus geen rol — anders zou je
+    benadeeld worden omdat je de latere winnaar toevallig vroeg trof.
+    """
+    kwaliteit = {t: 0 for t in punten_van}
+    programma = {t: 0 for t in punten_van}
+    for g in db.execute("""
+        SELECT team1_id, team2_id, winner_team_id FROM games
+        WHERE tournament_id = ? AND fase = 'bracket' AND status = 'gespeeld'
+    """, (tid,)):
+        w = g["winner_team_id"]
+        v = g["team2_id"] if w == g["team1_id"] else g["team1_id"]
+        if w in kwaliteit and v in punten_van:
+            kwaliteit[w] += punten_van[v]
+        if w in programma and v in punten_van:
+            programma[w] += punten_van[v]
+        if v in programma and w in punten_van:
+            programma[v] += punten_van[w]
+    return kwaliteit, programma
+
+
+def elo_na_bracketfase(db, tid):
+    """Hoeveel ELO elk team wón of verlóór tijdens de bracketfase.
+
+    Dit is een **toernooikracht**: iedereen begint op nul, ongeacht met welke
+    rating hij binnenkwam. Enkel wat je vanavond deed telt mee. Een team dat
+    even veel punten pakte maar tegen sterkere tegenstanders, staat hoger.
+
+    Waarom niet gewoon de ELO zelf? Omdat die op een eerste toernooi voor
+    iedereen 1000 is (en dus niets zegt), en later juist de geschiedenis zou
+    laten meespelen: wie vorige maand goed speelde, zou vandaag een streepje
+    voor krijgen bij een gelijke stand. Dat willen we niet.
+
+    Knockoutwedstrijden tellen bewust niet mee: die komen later, en anders zou
+    de bracketstand achteraf nog verschuiven.
+    """
+    eerste, laatste = {}, {}
+    for r in db.execute("""
+        SELECT rh.entity_id AS team_id, rh.elo_voor, rh.elo_na
+        FROM rating_history rh
+        JOIN games g ON g.id = rh.game_id
+        WHERE rh.entity_type = 'team' AND rh.scope = 'permanent'
+          AND g.tournament_id = ? AND g.fase = 'bracket'
+        ORDER BY g.played_at, g.id
+    """, (tid,)):
+        eerste.setdefault(r["team_id"], r["elo_voor"])   # stand vóór de eerste
+        laatste[r["team_id"]] = r["elo_na"]              # stand na de laatste
+    return {t: laatste[t] - eerste[t] for t in laatste}
+
+
 def _mini_punten(games, groep):
     """Punten die de teams uit `groep` onderling tegen elkaar pakten."""
     punten = {t: 0 for t in groep}
@@ -452,26 +537,40 @@ def _mini_verlies(games, groep):
     return verlies
 
 
-def stand(db, tid):
+def stand(db, tid, hypothese=None):
     """De stand van de bracketfase, met alle tiebreakinformatie.
 
     Geeft een lijst dicts terug, gesorteerd van 1 naar laatst:
       positie, team_id, naam, pot, gespeeld, winst, verlies, punten,
       doorstoot (bool), gedeeld (bool: gelijk geëindigd, ELO besliste),
       onbeslist (bool: er is nog een shootout nodig)
+
+    Met `hypothese` ({game_id: winnaar_id}) reken je een "wat als" door zonder
+    iets weg te schrijven: die shootouts tellen dan mee alsof ze zo gespeeld
+    zijn. Zo kunnen we scenario's uitrekenen terwijl er honderd mensen op de
+    pagina zitten, zonder dat er ook maar één regel in de database verandert.
     """
     t = toernooi(db, tid)
     teams = {x["id"]: x for x in deelnemers(db, tid)}
     bracket = [g for g in games_van(db, tid, "bracket")]
     shootouts = [g for g in games_van(db, tid, "shootout")]
+    if hypothese:
+        shootouts = [dict(g, status="gespeeld", winner_team_id=hypothese[g["id"]])
+                     if g["id"] in hypothese else g for g in shootouts]
+
+    kracht_van = elo_na_bracketfase(db, tid)
 
     rijen = {}
     for tid_, team in teams.items():
-        # start_elo = de permanente ELO op het moment van de loting. Zo blijft de
-        # stand stabiel, ook als de ELO tijdens het toernooi verandert.
+        # start_elo = de permanente ELO op het moment van de loting (voor de potten).
+        start = team["start_elo"] if team["start_elo"] is not None else team["elo"]
         rijen[tid_] = {"team_id": tid_, "naam": team["naam"], "pot": team["pot"],
-                       "elo": team["start_elo"] if team["start_elo"] is not None
-                              else team["elo"],
+                       "elo": start,
+                       # Toernooikracht = de ELO die je vanavond won of verloor.
+                       # Laatste tiebreak vóór de loting: wie zijn punten tegen
+                       # sterkere tegenstanders pakte, staat hoger. Wie nog niet
+                       # speelde staat op 0.
+                       "kracht": kracht_van.get(tid_, 0.0),
                        "avatar": team["avatar"],
                        "spelers": team["spelers"],
                        "gespeeld": 0, "winst": 0, "verlies": 0, "punten": 0,
@@ -492,9 +591,19 @@ def stand(db, tid):
         if g["status"] == "gespeeld" and g["winner_team_id"] in rijen:
             rijen[g["winner_team_id"]]["shootouts"] += 1
 
-    # Sorteren: punten → onderling (bracket) → onderling (shootouts) → ELO → naam.
+    # Kwaliteit van je overwinningen en zwaarte van je programma: die beslissen
+    # vóór de ELO, omdat ze uit de eindstand komen en dus niet afhangen van het
+    # moment waarop je iemand trof.
+    punten_van = {team_id: r["punten"] for team_id, r in rijen.items()}
+    kwaliteit, programma = winstkwaliteit(db, tid, punten_van)
+    for team_id, r in rijen.items():
+        r["kwaliteit"] = kwaliteit.get(team_id, 0)
+        r["programma"] = programma.get(team_id, 0)
+
+    # punten → onderling → shootouts → kwaliteit → programma → ELO → loting.
     lijst = list(rijen.values())
-    lijst.sort(key=lambda r: (-r["punten"], -r["elo"], r["naam"]))
+    lijst.sort(key=lambda r: (-r["punten"], -r["kwaliteit"], -r["programma"],
+                              -r["kracht"], lot_sleutel(tid, r["team_id"])))
 
     geordend = []
     onbesliste_groepen = []
@@ -507,7 +616,8 @@ def stand(db, tid):
         if len(groep) == 1:
             geordend.append(groep[0])
         else:
-            geordend.extend(_orden_groep(groep, bracket, shootouts, onbesliste_groepen))
+            geordend.extend(_orden_groep(groep, bracket, shootouts,
+                                        onbesliste_groepen, tid))
         i = j + 1
 
     cut = t["ko_teams"]
@@ -530,11 +640,18 @@ def stand(db, tid):
     beslissend = []
     for groep in onbesliste_groepen:
         plaatsen = sorted(ids_op_plaats[t_] for t_ in groep)
-        if plaatsen[0] <= cut < plaatsen[-1]:
-            beslissend.append(groep)
-            for r in geordend:
-                if r["team_id"] in groep:
-                    r["onbeslist"] = True
+        if not (plaatsen[0] <= cut < plaatsen[-1]):
+            continue
+        # Niet de hele groep speelt: enkel wie rond de streep staat en dus nog
+        # écht iets te winnen of te verliezen heeft.
+        strijd = strijdgroep(sorted(groep, key=lambda x: ids_op_plaats[x]),
+                             ids_op_plaats, cut)
+        if not strijd:
+            continue
+        beslissend.append(sorted(strijd))
+        for r in geordend:
+            if r["team_id"] in strijd:
+                r["onbeslist"] = True
     return geordend, beslissend
 
 
@@ -553,7 +670,30 @@ def _volledig_onderling(games, ids):
     return nodig <= gespeeld
 
 
-def _orden_groep(groep, bracket, shootouts, onbesliste_groepen):
+def strijdgroep(volgorde_in_groep, plaats_van, cut):
+    """Wie speelt er écht voor een ticket?
+
+    De hele groep staat gelijk op punten en ligt over de streep: van de m ploegen
+    raken er k door. Zou iedereen een shootout spelen, dan win je met m/2 ploegen
+    — en dat is zelden precies k. Het verschil komt terecht bij ploegen die er
+    hoe dan ook in of uit liggen, en die spelen dus een partij waar ze zelf niets
+    aan hebben. Dat is de kiem van een geregelde uitslag.
+
+    Daarom laten we de bovenste k−j en de onderste m−k−j met rust — hun plaats
+    verandert toch niet meer — en spelen de 2j ploegen rond de streep j partijen,
+    telkens winnaar door en verliezer eruit. Met j = min(k, m−k) is dat het
+    grootst mogelijke aantal echte beslissingswedstrijden, en geen enkele ploegen
+    speelt nog voor spek en bonen.
+    """
+    m = len(volgorde_in_groep)
+    k = sum(1 for t in volgorde_in_groep if plaats_van[t] <= cut)
+    j = min(k, m - k)
+    if j <= 0:
+        return set()
+    return set(volgorde_in_groep[k - j:k + j])
+
+
+def _orden_groep(groep, bracket, shootouts, onbesliste_groepen, tid):
     """Orden teams die op punten gelijk staan: onderling resultaat eerst."""
     ids = {r["team_id"] for r in groep}
     if _volledig_onderling(bracket, ids):
@@ -563,29 +703,54 @@ def _orden_groep(groep, bracket, shootouts, onbesliste_groepen):
     so, _ = _mini_punten(shootouts, ids)
     so_verlies = _mini_verlies(shootouts, ids)
 
+    # Hoeveel shootouts speelde elk team al? Wie er één gespeeld heeft, heeft
+    # zijn kans gehad: er komt geen tweede ronde meer.
+    gespeelde_so = {t: 0 for t in ids}
+    for g in shootouts:
+        if g["status"] != "gespeeld":
+            continue
+        for kant in (g["team1_id"], g["team2_id"]):
+            if kant in gespeelde_so:
+                gespeelde_so[kant] += 1
+
+    def rekenwerk(r):
+        # Wat het rekenwerk al kan onderscheiden, hoeft niemand te spelen:
+        # eerst het onderlinge duel, dan de kwaliteit van je overwinningen,
+        # dan je hele programma.
+        return (-(h2h[r["team_id"]]), -r.get("kwaliteit", 0), -r.get("programma", 0))
+
     def sleutel(r):
-        # Wie zijn shootout won staat bovenaan, wie nog moet spelen ertussen,
-        # wie verloor onderaan. Zo is een verliezer meteen uitgeklaard.
-        return (-(h2h[r["team_id"]]), -(so[r["team_id"]]), so_verlies[r["team_id"]],
-                -r["elo"], r["naam"])
+        # Pas daarna de shootout: wie won staat bovenaan, wie niet hoefde te
+        # spelen ertussen, wie verloor onderaan. Blijft het dan nog gelijk, dan
+        # rest enkel de toernooikracht en de loting.
+        return rekenwerk(r) + (-(so[r["team_id"]]), so_verlies[r["team_id"]],
+                               -r.get("kracht", 0.0), lot_sleutel(tid, r["team_id"]))
 
     gesorteerd = sorted(groep, key=sleutel)
 
-    # Teams met exact dezelfde tiebreakwaarden blijven onbeslist.
+    # Er komt hoogstens ÉÉN shootoutronde per puntengroep. Is die gespeeld, dan
+    # ligt de volgorde vast — ook voor wie niet meespeelde. Zo weet de zaal
+    # meteen hoeveel shootouts er komen en kan er achteraf niets meer bijkomen.
+    ronde_gehad = any(gespeelde_so[t] > 0 for t in ids)
+
+    # Wie ook na het rekenwerk én de shootouts nog exact gelijk staat, blijft
+    # onbeslist: enkel dán is een shootout nog zinvol.
+    def zelfde(a, b):
+        return (rekenwerk(a) == rekenwerk(b)
+                and so[a["team_id"]] == so[b["team_id"]]
+                and so_verlies[a["team_id"]] == so_verlies[b["team_id"]])
+
     k = 0
     while k < len(gesorteerd):
         m = k
-        while (m + 1 < len(gesorteerd)
-               and h2h[gesorteerd[m + 1]["team_id"]] == h2h[gesorteerd[k]["team_id"]]
-               and so[gesorteerd[m + 1]["team_id"]] == so[gesorteerd[k]["team_id"]]
-               and so_verlies[gesorteerd[m + 1]["team_id"]]
-                   == so_verlies[gesorteerd[k]["team_id"]]):
+        while m + 1 < len(gesorteerd) and zelfde(gesorteerd[m + 1], gesorteerd[k]):
             m += 1
         if m > k:
-            deel = {r["team_id"] for r in gesorteerd[k:m + 1]}
-            onbesliste_groepen.append(deel)
+            deel = [r["team_id"] for r in gesorteerd[k:m + 1]]
             for r in gesorteerd[k:m + 1]:
                 r["gedeeld"] = True
+            if not ronde_gehad:
+                onbesliste_groepen.append(deel)
         k = m + 1
     return gesorteerd
 
@@ -606,6 +771,7 @@ def tiebreak_groepen(db, tid):
     shootouts = games_van(db, tid, "shootout")
     beslissende_ids = [set(x) for x in beslissend]
     cut = t["ko_teams"]
+    inzet = shootout_inzet(db, tid)
 
     groepen = []
     i = 0
@@ -628,48 +794,125 @@ def tiebreak_groepen(db, tid):
         duels = []
         for g in list(bracket) + list(shootouts):
             if g["team1_id"] in ids and g["team2_id"] in ids:
+                staat_op_spel = inzet.get(g["id"], {})
                 duels.append({"fase": g["fase"], "team1": g["team1_id"],
                               "team2": g["team2_id"], "status": g["status"],
                               "winnaar": g["winner_team_id"],
-                              "moment": g["scheduled_at"]})
+                              "moment": g["scheduled_at"], "game_id": g["id"],
+                              "uit_bij_verlies": staat_op_spel.get("uit_bij_verlies", []),
+                              "door_bij_winst": staat_op_spel.get("door_bij_winst", [])})
         duels.sort(key=lambda d: (d["fase"] != "bracket", d["moment"] or ""))
+
+        # Vorm per team, net als in de gewone stand: één bolletje per shootout,
+        # in de volgorde waarin ze gespeeld werden. Bij een kringetje zie je zo
+        # meteen "W V" staan in plaats van een misleidend "gewonnen".
+        so_vorm = {t: [] for t in ids}
+        for d in duels:
+            if d["fase"] != "shootout":
+                continue
+            for kant in (d["team1"], d["team2"]):
+                if d["status"] != "gespeeld":
+                    so_vorm[kant].append("?")
+                else:
+                    so_vorm[kant].append("W" if d["winnaar"] == kant else "V")
 
         raakt_ticket = any(ids & b for b in beslissende_ids)
         wacht = any(r.get("onbeslist") for r in rijen)
-        if wacht:
+
+        # Doet de toernooikracht hier écht het werk? Enkel als twee ploegen die
+        # naast elkaar staan op álles daarvóór gelijk zijn en toch uit elkaar
+        # gehaald worden. Dan hoort dat cijfer ook op het scherm te staan.
+        def gelijk_tot_kracht(a, b):
+            return (h2h[a["team_id"]] == h2h[b["team_id"]]
+                    and a.get("kwaliteit", 0) == b.get("kwaliteit", 0)
+                    and a.get("programma", 0) == b.get("programma", 0)
+                    and so[a["team_id"]] == so[b["team_id"]]
+                    and so_verlies[a["team_id"]] == so_verlies[b["team_id"]])
+
+        kracht_beslist = any(
+            gelijk_tot_kracht(a, b) and round(a["kracht"], 6) != round(b["kracht"], 6)
+            for a, b in zip(rijen, rijen[1:]))
+        open_so = [d for d in duels if d["fase"] == "shootout" and d["status"] != "gespeeld"]
+        if open_so and not wacht:
+            # Er loopt nog een shootout in deze groep: de volgorde hieronder is
+            # dus voorlopig. Dit als "beslist" tonen is misleidend.
+            status, uitleg = "shootout_bezig", (
+                f"Er {'staat' if len(open_so) == 1 else 'staan'} nog "
+                f"{len(open_so)} shootout{'' if len(open_so) == 1 else 's'} op het "
+                "programma in deze groep; de volgorde hieronder is dus nog voorlopig. "
+                "Er komen er geen bij: ligt onderweg al vast wie doorstoot, dan "
+                "vervallen de resterende, anders blijft het bij deze.")
+        elif wacht:
+            meespelers = sum(1 for r in rijen if r.get("onbeslist"))
             status, uitleg = "shootout", (
-                "Deze teams staan volledig gelijk én het gaat over een ticket voor de "
-                "knockout. Een shootout beslist wie doorgaat.")
+                "Deze teams staan gelijk op punten, op de kwaliteit van hun "
+                "overwinningen én op hun programma — er valt niets meer te rekenen, "
+                "en het gaat over een ticket voor de knockout. Wie ook daarna nog "
+                f"sowieso boven of onder de streep eindigt, blijft buiten schot; de "
+                f"{meespelers} ploegen rond de streep spelen om de overblijvende "
+                "plaatsen. Elke partij is winnaar door, verliezer eruit, en ze gaan "
+                "allemaal tegelijk door zodat niemand de andere uitslagen al kent.")
         elif volledig and len(set(h2h.values())) > 1:
             status, uitleg = "onderling", (
                 "Alle teams speelden onderling tegen elkaar, dus dat onderlinge "
                 "resultaat beslist.")
-        elif len(set(so.values())) > 1 or len(set(so_verlies.values())) > 1:
+        elif any(d["fase"] == "shootout" and d["status"] == "gespeeld" for d in duels):
+            # Er is hier een shootout gespeeld. Dat is het opvallendste wat er
+            # gebeurd is, dus dat vermelden we eerst — ook al staat de rest van
+            # de groep op kwaliteit of programma gerangschikt.
             status, uitleg = "shootout_klaar", (
-                "De shootout is gespeeld; die bepaalt de volgorde.")
-        elif not volledig:
-            status, uitleg = "elo", (
-                "Deze teams speelden niet allemaal onderling tegen elkaar, dus het "
-                "onderlinge resultaat telt niet mee. Omdat "
-                "er geen ticket op het spel staat, beslist de ELO van bij de loting.")
+                "Het rekenwerk bracht deze groep tot aan de streep, maar kon de "
+                "ploegen op de streep zelf niet scheiden. Daar besliste een shootout "
+                "wie het laatste ticket pakt. Erboven en eronder bepalen de kwaliteit "
+                "van de overwinningen en het programma de volgorde.")
+        elif len({r.get("kwaliteit", 0) for r in rijen}) > 1:
+            status, uitleg = "kwaliteit", (
+                "De kwaliteit van de overwinningen beslist: de som van de punten van "
+                "de teams die je versloeg.")
+        elif len({r.get("programma", 0) for r in rijen}) > 1:
+            status, uitleg = "programma", (
+                "Ze klopten even sterke teams, dus telt het hele programma mee: de "
+                "punten van álle tegenstanders die je trof.")
         else:
-            status, uitleg = "elo", (
-                "Onderling geeft dit geen uitsluitsel en er staat geen ticket op het "
-                "spel, dus de ELO van bij de loting bepaalt de volgorde.")
+            if len({round(r["kracht"], 6) for r in rijen}) > 1:
+                grond = ("kwaliteit en programma zijn gelijk, dus beslist de "
+                         "toernooikracht: de ELO die je vanavond won of verloor.")
+            else:
+                grond = ("deze teams zijn op geen enkele manier meer van elkaar te "
+                         "onderscheiden: de onderlinge volgorde is geloot.")
+            if not volledig:
+                status, uitleg = "elo", (
+                    "Deze teams speelden niet allemaal onderling tegen elkaar, dus het "
+                    "onderlinge resultaat telt niet mee. Er staat geen ticket op het "
+                    "spel, en " + grond)
+            else:
+                status, uitleg = "elo", (
+                    "Onderling geeft dit geen uitsluitsel en er staat geen ticket op "
+                    "het spel, dus " + grond)
 
         groepen.append({
             "punten": rijen[0]["punten"],
             "raakt_ticket": raakt_ticket,
             "status": status,
             "uitleg": uitleg,
+            "kracht_beslist": kracht_beslist,
             "onderling_volledig": volledig,
             "cut": cut,
             "duels": duels,
             "teams": [{
                 "team_id": r["team_id"], "naam": r["naam"], "positie": r["positie"],
                 "doorstoot": r["doorstoot"], "elo": r["elo"],
+                "kracht": r["kracht"],
                 "h2h_punten": h2h[r["team_id"]], "h2h_gespeeld": h2h_gespeeld[r["team_id"]],
                 "so_punten": so[r["team_id"]], "so_verlies": so_verlies[r["team_id"]],
+                "kwaliteit": r.get("kwaliteit", 0), "programma": r.get("programma", 0),
+                "so_vorm": so_vorm[r["team_id"]],
+                "so_winst": sum(1 for x in so_vorm[r["team_id"]] if x == "W"),
+                # Enkel voor wie zélf nog moet spelen ligt de plaats niet vast.
+                # Wie buiten de shootout blijft, staat al waar hij eindigt.
+                "voorlopig": any(d["fase"] == "shootout" and d["status"] != "gespeeld"
+                                 and r["team_id"] in (d["team1"], d["team2"])
+                                 for d in duels),
                 "onbeslist": r.get("onbeslist", False),
             } for r in rijen],
         })
@@ -694,23 +937,20 @@ def _bracket_klaar(db, tid):
 
 
 def _shootout_paren(groep, rng):
-    """Zo weinig mogelijk beslissingswedstrijden om een gelijke groep te splitsen.
+    """Koppel de strijdende ploegen: winnaar door, verliezer eruit.
 
-    De teams worden willekeurig gekoppeld: de winnaars vormen de bovenste helft,
-    de verliezers de onderste. Beslist dat nog niet over het laatste ticket, dan
-    volgt er vanzelf een nieuwe (kleinere) ronde. Bij een oneven groep spelen
-    drie teams een onderling driehoekje.
+    `strijdgroep` levert altijd een even aantal ploegen die om precies evenveel
+    tickets spelen, dus één willekeurige koppeling volstaat. Iedereen speelt
+    exact één partij en die partij beslist over zijn eigen ticket — er is dus
+    niemand die kan toegeven zonder er zelf onder te lijden. Omdat geen enkele
+    ploeg twee keer speelt, kunnen alle partijen bovendien tegelijk op
+    verschillende tafels: niemand kent de andere uitslagen al.
     """
     leden = sorted(groep)
     rng.shuffle(leden)
-    paren = []
-    if len(leden) % 2:
-        a, b, c = leden[:3]
-        paren += [(a, b), (b, c), (a, c)]
-        leden = leden[3:]
-    for i in range(0, len(leden), 2):
-        paren.append((leden[i], leden[i + 1]))
-    return paren
+    if len(leden) % 2:                      # hoort niet te gebeuren
+        leden = leden[:-1]
+    return [(leden[i], leden[i + 1]) for i in range(0, len(leden), 2)]
 
 
 def _maak_shootouts(db, t, groepen, rng=None):
@@ -787,6 +1027,158 @@ def maak_knockout(db, t, geplaatst):
     db.commit()
 
 
+def _doorstoters(db, tid, cut, hypothese=None):
+    """De verzameling teams die doorstoot — eventueel in een 'wat als'-scenario."""
+    geordend, _ = stand(db, tid, hypothese)
+    return frozenset(r["team_id"] for r in geordend[:cut])
+
+
+def _scenarios(anderen, vast=None):
+    """Alle mogelijke uitslagen van een reeks openstaande shootouts."""
+    basis = dict(vast or {})
+    for combinatie in range(2 ** len(anderen)):
+        scenario = dict(basis)
+        for i, ander in enumerate(anderen):
+            scenario[ander["id"]] = (ander["team1_id"] if (combinatie >> i) & 1
+                                     else ander["team2_id"])
+        yield scenario
+
+
+def _wis_zinloze_shootouts(db, tid):
+    """Schrap geplande shootouts waarvan de uitslag niets meer beslist.
+
+    Soms ligt na een paar shootouts al vast wie doorstoot, terwijl er nog een
+    wedstrijd op het programma staat die enkel de volgorde ónder of bóven de
+    streep verandert. Die laten spelen is tijdverlies: we halen ze weg.
+
+    Voor elke geplande shootout rekenen we beide uitslagen door. Verandert de
+    groep doorstoters niet, dan is de wedstrijd overbodig — tenzij het schema ze
+    meteen opnieuw zou aanmaken, want dan blijven we in een kringetje draaien.
+    """
+    t = toernooi(db, tid)
+    if not t or t["status"] != "bracket":
+        return []
+    cut = t["ko_teams"]
+    open_games = _open_shootouts(db, tid)
+    # Meer dan een handvol openstaande shootouts? Dan zijn er te veel combinaties
+    # om door te rekenen; we schrappen dan niets en spelen ze gewoon allemaal.
+    if len(open_games) > 7:
+        return []
+
+    geschrapt = []
+    for g in open_games:
+        anderen = [x for x in open_games if x["id"] != g["id"]
+                   and x["id"] not in geschrapt]
+        # Beslist deze wedstrijd iets, wélke uitslag de andere shootouts ook
+        # krijgen? Enkel als het antwoord voor élke combinatie "nee" is, mag hij
+        # weg. Anders zou hij later weer nodig kunnen zijn en opnieuw opduiken —
+        # en dat is precies de verrassing die we willen vermijden.
+        overbodig = True
+        for scenario in _scenarios(anderen):
+            uitkomsten = {_doorstoters(db, tid, cut, {**scenario, g["id"]: w})
+                          for w in (g["team1_id"], g["team2_id"])}
+            if len(uitkomsten) > 1:
+                overbodig = False
+                break
+        if not overbodig:
+            continue                               # beslist wel degelijk iets
+
+        # Zou het schema hem meteen opnieuw aanmaken? Dan laten we hem staan.
+        db.execute("DELETE FROM games WHERE id = ?", (g["id"],))
+        db.commit()
+        _, beslissend = stand(db, tid)
+        if any({g["team1_id"], g["team2_id"]} & set(groep) for groep in beslissend):
+            db.execute("""
+                INSERT INTO games (id, team1_id, team2_id, tournament_id, fase,
+                                   scheduled_at, location_id, status)
+                VALUES (?, ?, ?, ?, 'shootout', ?, ?, 'gepland')
+            """, (g["id"], g["team1_id"], g["team2_id"], tid, g["scheduled_at"],
+                  g["location_id"]))
+            db.commit()
+            continue
+        geschrapt.append(g["id"])
+    return geschrapt
+
+
+def _open_shootouts(db, tid):
+    return db.execute("""
+        SELECT * FROM games WHERE tournament_id = ? AND fase = 'shootout'
+          AND status = 'gepland' AND team1_id IS NOT NULL AND team2_id IS NOT NULL
+        ORDER BY scheduled_at, id
+    """, (tid,)).fetchall()
+
+
+_inzet_cache = {}                                  # {tid: (vingerafdruk, uitkomst)}
+
+
+def _uitslagen_afdruk(db, tid):
+    """Korte handtekening van alle uitslagen in dit toernooi."""
+    h = hashlib.sha1()
+    for r in db.execute("SELECT id, status, winner_team_id FROM games "
+                        "WHERE tournament_id = ? ORDER BY id", (tid,)):
+        h.update(f"{r[0]}:{r[1]}:{r[2]};".encode())
+    return h.hexdigest()
+
+
+def shootout_inzet(db, tid):
+    """Wat staat er op het spel bij elke openstaande shootout?
+
+    Staan er drie shootouts op het bord, dan lijkt het alsof je nog drie kansen
+    hebt — terwijl één nederlaag je er soms meteen uit knikkert. Dat hoor je te
+    weten vóór je speelt, niet erna.
+
+    Per geplande shootout kijken we daarom, over álle uitslagen van de andere
+    openstaande shootouts heen, of een ploeg bij verlies zeker uitgeschakeld is,
+    of bij winst zeker door. We melden dat enkel als de andere uitslag het
+    verschil maakt: "zeker door bij winst" zeggen tegen een ploeg die sowieso
+    doorstoot, is geen nieuws.
+
+    Geeft {game_id: {"uit_bij_verlies": [team_id, ...],
+                     "door_bij_winst": [team_id, ...]}}.
+    """
+    t = toernooi(db, tid)
+    if not t or t["status"] != "bracket":
+        return {}
+    # Dit blijft hetzelfde tot er een uitslag verandert, en de pagina wordt vaak
+    # herladen. Eén keer rekenen volstaat dus.
+    afdruk = _uitslagen_afdruk(db, tid)
+    bewaard = _inzet_cache.get(tid)
+    if bewaard and bewaard[0] == afdruk:
+        return bewaard[1]
+
+    cut = t["ko_teams"]
+    open_games = _open_shootouts(db, tid)
+    # Bij meer dan een handvol openstaande shootouts zijn er te veel scenario's
+    # om door te rekenen. Dan zeggen we liever niets dan iets traags of iets fouts.
+    if not open_games or len(open_games) > 6:
+        _inzet_cache[tid] = (afdruk, {})
+        return {}
+
+    inzet = {}
+    for g in open_games:
+        anderen = [x for x in open_games if x["id"] != g["id"]]
+        kanten = (g["team1_id"], g["team2_id"])
+        # vlag[winnaar van deze partij][team] = [altijd door, altijd uit]
+        vlag = {w: {k: [True, True] for k in kanten} for w in kanten}
+        for scenario in _scenarios(anderen):
+            for w in kanten:
+                door = _doorstoters(db, tid, cut, {**scenario, g["id"]: w})
+                for k in kanten:
+                    vlag[w][k][0 if k not in door else 1] = False
+
+        uit, zeker = [], []
+        for k in kanten:
+            tegen = kanten[1] if k == kanten[0] else kanten[0]
+            bij_winst, bij_verlies = vlag[k][k], vlag[tegen][k]
+            if bij_verlies[1] and not bij_winst[1]:
+                uit.append(k)                                # verliezen = eruit
+            if bij_winst[0] and not bij_verlies[0]:
+                zeker.append(k)                              # winnen = zeker door
+        inzet[g["id"]] = {"uit_bij_verlies": uit, "door_bij_winst": zeker}
+    _inzet_cache[tid] = (afdruk, inzet)
+    return inzet
+
+
 def evalueer(db, tid):
     """Werk de toestand van het toernooi bij. Idempotent: mag na élk resultaat
     (en na elke herberekening) opnieuw gedraaid worden.
@@ -847,13 +1239,25 @@ def evalueer(db, tid):
                 else:
                     meldingen.append("Er zijn geen shootouts meer nodig.")
                 return meldingen
+        # Ligt het doorstoten intussen al vast? Dan hoeft de rest niet gespeeld.
+        weg = _wis_zinloze_shootouts(db, tid)
+        if weg:
+            meldingen.append(
+                f"{len(weg)} shootout(s) geschrapt: de uitslag daarvan verandert "
+                "niets meer aan wie doorstoot.")
+            return evalueer(db, tid) + meldingen
         return meldingen                      # wachten tot ze gespeeld zijn
 
     if beslissend:
         aantal = _maak_shootouts(db, t, beslissend)
+        weg = _wis_zinloze_shootouts(db, tid)
         meldingen.append(
-            f"{aantal} shootout(s) ingepland: er staan teams gelijk op punten "
-            "en het onderlinge duel gaf geen uitsluitsel.")
+            f"{aantal - len(weg)} shootout(s) ingepland: er staan teams gelijk op "
+            "punten en het onderlinge duel gaf geen uitsluitsel.")
+        if _bracketfase_gespeeld(db, tid) and not db.execute(
+                "SELECT 1 FROM games WHERE tournament_id = ? AND fase = 'shootout' "
+                "AND status = 'gepland'", (tid,)).fetchone():
+            return evalueer(db, tid) + meldingen
     else:
         geplaatst = [r["team_id"] for r in geordend[:t["ko_teams"]]]
         maak_knockout(db, t, geplaatst)

@@ -296,10 +296,14 @@ def herbereken_alles(db):
         s2 = {pid: speler_elos[pid] for pid in team_leden[t2]}
         winnaar = 1 if w["winner_team_id"] == t1 else 2
         f = fase_factor(w["fase"], w["ronde"])
+        # In de knockout betaalt de verliezer maar een deel: zo kost ver
+        # geraken nooit ELO. Zie de uitleg bij KO_VERLIES in elo.py.
+        f_verlies = fase_factor(w["fase"], w["ronde"], verloren=True)
+        deel = (f_verlies / f) if f else 1.0
 
         nieuwe, nieuw_t1, nieuw_t2 = proces_wedstrijd(s1, s2, team_elos[t1],
                                                       team_elos[t2], winnaar,
-                                                      k_s * f, k_t * f)
+                                                      k_s * f, k_t * f, deel)
 
         for pid, na in nieuwe.items():
             db.execute("INSERT INTO rating_history (game_id, entity_type, entity_id, "
@@ -1002,6 +1006,18 @@ def bewaar_avatar(bestand, prefix, oud=None):
 @app.template_filter("elo")
 def filter_elo(waarde):
     return f"{waarde:.0f}"
+
+
+@app.template_filter("kracht")
+def filter_kracht(waarde):
+    """Toernooikracht: de ELO die je vanavond won of verloor, mét teken.
+
+    Twee cijfers na de komma: dit staat er enkel als het cijfer de volgorde
+    bepaalt, en dan mogen twee ploegen die net niet gelijk staan er niet gelijk
+    uitzien. De `or 0.0` houdt een lelijke "-0,00" weg.
+    """
+    afgerond = round(waarde or 0.0, 2) or 0.0
+    return f"{afgerond:+.2f}".replace(".", ",")
 
 
 @app.template_filter("datum")
@@ -1798,22 +1814,33 @@ def team_bewerken(team_id):
     db = get_db()
     speler_id = session["speler_id"]
     team = db.execute("SELECT * FROM teams WHERE id = ?", (team_id,)).fetchone()
-    if not team or speler_id not in (team["player1_id"], team["player2_id"]):
+    # De twee spelers beheren hun eigen team; een organisator mag bijspringen om
+    # een schrijffout of een ongepaste naam recht te zetten.
+    if not team or not (speler_id in (team["player1_id"], team["player2_id"])
+                        or is_organisator()):
         abort(403)
+    # Vanuit het organisatiepaneel komt enkel een naam mee: dan laten we de
+    # beschrijving met rust in plaats van ze leeg te maken.
+    terug = request.form.get("terug") or ""
+    # Enkel een pad op deze site: anders kan iemand je via een formulier naar
+    # een vreemde website sturen.
+    if not terug.startswith("/") or terug.startswith("//"):
+        terug = url_for("team_profiel", team_id=team_id)
 
     naam = (request.form.get("naam") or "").strip()
-    beschrijving = (request.form.get("beschrijving") or "").strip()[:200]
     if not naam or len(naam) > 40:
-        flash("Geef je team een naam van maximaal 40 tekens.", "fout")
-        return redirect(url_for("team_profiel", team_id=team_id))
+        flash("Geef het team een naam van maximaal 40 tekens.", "fout")
+        return redirect(terug)
     bestaat = db.execute("SELECT 1 FROM teams WHERE name = ? AND id != ?",
                          (naam, team_id)).fetchone()
     if bestaat:
         flash("Er bestaat al een team met die naam.", "fout")
-        return redirect(url_for("team_profiel", team_id=team_id))
+        return redirect(terug)
 
-    db.execute("UPDATE teams SET name = ?, description = ? WHERE id = ?",
-               (naam, beschrijving, team_id))
+    db.execute("UPDATE teams SET name = ? WHERE id = ?", (naam, team_id))
+    if "beschrijving" in request.form:
+        db.execute("UPDATE teams SET description = ? WHERE id = ?",
+                   ((request.form.get("beschrijving") or "").strip()[:200], team_id))
 
     bestand = request.files.get("avatar")
     if bestand and bestand.filename:
@@ -1824,8 +1851,8 @@ def team_bewerken(team_id):
             flash("Die teamfoto kon niet opgeslagen worden (toegelaten: "
                   "png, jpg, webp of gif, max. 3 MB).", "fout")
     db.commit()
-    flash("Team bijgewerkt.", "ok")
-    return redirect(url_for("team_profiel", team_id=team_id))
+    flash(f"Team heet nu “{naam}”." if naam != team["name"] else "Team bijgewerkt.", "ok")
+    return redirect(terug)
 
 
 @app.route("/team/<int:team_id>/opheffen", methods=["POST"])
@@ -3384,6 +3411,7 @@ def toernooi_beheer(toernooi_id):
                            openstaand=openstaand, recent=recent,
                            namen=teamnamen(db),
                            meldingen_per_game=meldingen_per_game,
+                           inzet=toernooi_motor.shootout_inzet(db, toernooi_id),
                            controle=toernooi_motor.controleer(db, toernooi_id),
                            nu=datetime.now().strftime("%Y-%m-%dT%H:%M"))
 

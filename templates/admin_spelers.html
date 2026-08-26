@@ -153,6 +153,7 @@
 <div class="kaart">
   {% if spelers %}
   <div class="zoekbalk"><input type="search" placeholder="Zoek een speler op naam of nummer…" data-zoek="#spelertabel"></div>
+  <div class="tabel-venster">
   <table class="tabel" id="spelertabel">
     <thead><tr><th class="kol-rang">#</th><th>Naam</th><th>Foto</th><th class="kol-elo">ELO</th><th class="kol-num verbergen-mobiel">Wedstrijden in {{ maand_label }}</th><th>Status</th><th>Acties</th></tr></thead>
     <tbody>
@@ -242,6 +243,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   <p class="stil klein-tekst">Het maandelijkse aantal is informatief: jullie beslissen zelf hoeveel
      wedstrijden een speler per maand mag spelen.</p>
   {% else %}
@@ -284,8 +286,9 @@
 <div class="kaart">
   {% if teams %}
   <div class="zoekbalk"><input type="search" placeholder="Zoek een team of een speler…" data-zoek="#teamtabel"></div>
+  <div class="tabel-venster">
   <table class="tabel compact" id="teamtabel">
-    <thead><tr><th>Team</th><th class="wikkel">Spelers</th><th>Foto</th><th class="kol-elo">ELO</th><th>Status</th><th>Verwijderen</th></tr></thead>
+    <thead><tr><th>Team</th><th class="wikkel">Spelers</th><th>Naam wijzigen</th><th>Foto</th><th class="kol-elo">ELO</th><th>Status</th><th>Verwijderen</th></tr></thead>
     <tbody>
       {% for t in teams %}
       <tr>
@@ -293,6 +296,14 @@
           {%- if t.avatar %}<img class="avatar-mini" src="{{ url_for('media', bestand=t.avatar) }}" alt="">
           {%- else %}<span class="avatar-mini avatar-fallback">{{ t.naam[0]|upper }}</span>{% endif %} {{ t.naam }}</a></td>
         <td class="stil wikkel zoekbaar">{{ t.leden }}</td>
+        <td>
+          <form method="post" action="{{ url_for('team_bewerken', team_id=t.id) }}" class="rij-form nauw">
+            <input type="hidden" name="terug" value="{{ url_for('admin_spelers') }}#teams">
+            <input type="text" name="naam" value="{{ t.naam }}" maxlength="40" required
+                   aria-label="Nieuwe naam voor {{ t.naam }}">
+            <button type="submit" class="knop klein">Opslaan</button>
+          </form>
+        </td>
         <td>
           {% if t.avatar %}
           <form method="post" action="{{ url_for('team_avatar_wissen', team_id=t.id) }}"
@@ -328,6 +339,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   <p class="stil klein-tekst">Teams worden door de spelers zelf gemaakt: speler 1 nodigt uit,
      speler 2 aanvaardt. Pas dan kan het team wedstrijden spelen.</p>
   {% else %}
