@@ -7,7 +7,6 @@ Starten:
     python app.py
 Daarna surfen naar http://localhost:5000
 
-Standaard beheerderswachtwoord: "leberschuss" (wijzig meteen via Organisatie > Instellingen!)
 Spelers maken zelf een account aan, vormen zelf teams (met uitnodigingen) en
 melden zelf hun uitslagen; organisatoren beheren seizoenen, speeldagen en
 wedstrijden.
@@ -3307,6 +3306,7 @@ def toernooi_detail(toernooi_id):
                                       if t["status"] != "opzet" else []),
                            winnaar=winnaar, open_shootouts=open_shootouts,
                            label=TOERNOOI_STATUS.get(t["status"], ("", ""))[0],
+                           potten_getoond=toernooi_motor.potten_getoond(db, toernooi_id),
                            heeft_loting=t["status"] != "opzet")
 
 
@@ -3319,7 +3319,8 @@ def toernooi_loting(toernooi_id):
         return redirect(url_for("toernooi_detail", toernooi_id=toernooi_id))
     potten, rondes = toernooi_motor.loting_data(db, toernooi_id)
     return render_template("toernooi_loting.html", t=t, huidig_toernooi=t,
-                           potten=potten, rondes=rondes)
+                           potten=potten, rondes=rondes,
+                           potten_getoond=toernooi_motor.potten_getoond(db, toernooi_id))
 
 
 # ---------------------------------------------------------- toernooi-admin --
@@ -3412,6 +3413,7 @@ def toernooi_beheer(toernooi_id):
                            namen=teamnamen(db),
                            meldingen_per_game=meldingen_per_game,
                            inzet=toernooi_motor.shootout_inzet(db, toernooi_id),
+                           potten_getoond=toernooi_motor.potten_getoond(db, toernooi_id),
                            controle=toernooi_motor.controleer(db, toernooi_id),
                            nu=datetime.now().strftime("%Y-%m-%dT%H:%M"))
 

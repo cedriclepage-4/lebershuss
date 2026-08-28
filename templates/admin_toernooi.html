@@ -28,14 +28,14 @@
 <div class="kaart">
   {% if teams %}
   <table class="tabel compact">
-    <thead><tr><th>Team</th><th class="wikkel">Spelers</th><th class="kol-elo">ELO</th><th class="verbergen-mobiel">Pot</th><th></th></tr></thead>
+    <thead><tr><th>Team</th><th class="wikkel">Spelers</th><th class="kol-elo">ELO</th>{% if potten_getoond %}<th class="verbergen-mobiel">Pot</th>{% endif %}<th></th></tr></thead>
     <tbody>
       {% for team in teams %}
       <tr>
         <td class="naam">{{ team.naam }}</td>
         <td class="stil wikkel">{{ team.spelers }}</td>
         <td class="kol-elo">{{ team.elo|elo }}</td>
-        <td class="verbergen-mobiel">{% if team.pot %}<span class="pot-pil pot-{{ team.pot }}">{{ team.pot }}</span>{% else %}—{% endif %}</td>
+        {% if potten_getoond %}<td class="verbergen-mobiel"><span class="pot-pil pot-{{ team.pot }}">{{ team.pot }}</span></td>{% endif %}
         <td class="kol-num">
           {% if t['status'] == 'opzet' %}
           <form method="post" action="{{ url_for('toernooi_team_weg', toernooi_id=t['id'], team_id=team.id) }}">
@@ -190,7 +190,9 @@
           {% endfor %}
         </select>
       </label>
-      <label>Aantal potten <input type="number" name="potten" min="1" max="8" value="{{ t['potten'] }}"></label>
+      <label>Aantal potten <input type="number" name="potten" min="1" max="8" value="{{ t['potten'] }}">
+        <span class="stil klein-tekst">Staat iedereen nog op dezelfde rating, dan wordt dit
+          genegeerd en vrij geloot.</span></label>
       <label>Minuten per wedstrijd <input type="number" name="slot" min="5" max="120" value="{{ t['slot_minuten'] }}"></label>
     </div>
     {% else %}
@@ -209,7 +211,9 @@
     {% else %}
     <p>Alles staat klaar: <strong>{{ teams|length }} teams</strong>,
        {{ t['bracket_ronden'] }} wedstrijden per team,
-       {{ t['potten'] }} potten, {{ t['ko_teams'] }} teams naar de knockout,
+       {% if teams|map(attribute='elo')|map('round', 6)|unique|list|length > 1 %}{{ t['potten'] }} potten,
+       {% else %}vrije loting (iedereen op dezelfde rating),
+       {% endif %}{{ t['ko_teams'] }} teams naar de knockout,
        {{ locaties|length }} tafel(s).</p>
     {% if teams|length % 2 %}
     <p class="stil klein-tekst">Oneven aantal teams: elke ronde rust er één team,

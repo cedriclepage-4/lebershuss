@@ -111,6 +111,23 @@ def lot_sleutel(tid, team_id):
     return int(ruw[:12], 16)
 
 
+def potten_zinvol(teams):
+    """Hebben potten hier betekenis?
+
+    Potten bestaan om de sterke teams uit elkaar te loten. Staat iedereen op
+    exact dezelfde rating, dan valt er niets te spreiden en is "pot 1" niet meer
+    dan een etiket. Dan slaan we ze over.
+    """
+    return len({round(t["elo"], 6) for t in teams}) > 1
+
+
+def potten_getoond(db, tid):
+    """Zijn er in dit gelote toernooi meerdere potten? Zo niet: niet tonen."""
+    potten = {r["pot"] for r in db.execute(
+        "SELECT pot FROM tournament_teams WHERE tournament_id = ?", (tid,))}
+    return len(potten - {None}) > 1
+
+
 def potten_verdelen(teams, aantal_potten, rng=None):
     """Verdeel de teams (gesorteerd op permanente ELO) over de potten.
 
@@ -205,6 +222,46 @@ def _regulier_loten(team_ids, pot_van, ronden, rng, pogingen=800):
     raise ValueError("De loting lukte niet; probeer een ander aantal wedstrijden per team.")
 
 
+def _magere_ronde_naar_het_midden(rondes):
+    """Schuif de minst gevulde speelrondes naar het midden van het programma.
+
+    Loopt het aantal wedstrijden niet gelijk op met het aantal tafels — bij een
+    oneven aantal teams gebeurt dat bijna altijd — dan blijft er ergens een tafel
+    vrij. Vooraan is dat het vervelendst: dan staat een deel van de zaal bij de
+    aftrap al te wachten terwijl iedereen er net zin in heeft. Achteraan valt het
+    ook op, vlak vóór de knockout. In het midden is het gewoon een adempauze.
+
+    De volle rondes houden onderling hun oorspronkelijke volgorde, zodat de
+    spreiding die hierboven berekend is (niemand twee keer vlak na elkaar) zoveel
+    mogelijk overeind blijft; enkel het magere blok verhuist.
+    """
+    if len({len(r) for r in rondes}) < 2:
+        return rondes                       # allemaal even vol: niets te schuiven
+    volst = max(len(r) for r in rondes)
+    vol = [r for r in rondes if len(r) == volst]
+    mager = sorted((r for r in rondes if len(r) < volst), key=lambda r: -len(r))
+
+    def achter_elkaar(reeks):
+        """Hoe vaak moet een team twee speelrondes na elkaar aantreden?"""
+        bezet = [{t for paar in r for t in paar} for r in reeks]
+        return sum(len(a & b) for a, b in zip(bezet, bezet[1:]))
+
+    # Zo centraal mogelijk invoegen, en minstens één volle ronde vooraan — ook
+    # als er maar weinig volle rondes zijn. Liggen twee plekken even centraal
+    # (bij een oneven aantal volle rondes), dan kiezen we die waarbij de minste
+    # teams twee speelrondes na elkaar moeten aantreden.
+    doel = (len(vol) + len(mager) - 1) / 2          # het midden van het programma
+    kandidaten = range(1, max(2, len(vol) + 1))
+
+    def score(k):
+        hart_van_het_blok = k + (len(mager) - 1) / 2
+        return (abs(hart_van_het_blok - doel),
+                achter_elkaar(vol[:k] + mager + vol[k:]))
+
+    beste = min(kandidaten, key=score)
+    return vol[:beste] + mager + vol[beste:]
+
+
 def verdeel_in_rondes(paren, rng=None, max_per_ronde=None, pogingen=150):
     """Verdeel alle affiches over zo weinig mogelijk speelrondes.
 
@@ -259,9 +316,9 @@ def verdeel_in_rondes(paren, rng=None, max_per_ronde=None, pogingen=150):
                 if beste is None or len(gevuld) < len(beste):
                     beste = gevuld
                 if len(gevuld) == aantal:
-                    return gevuld
+                    return _magere_ronde_naar_het_midden(gevuld)
         if beste:
-            return beste
+            return _magere_ronde_naar_het_midden(beste)
     return [[paar] for paar in paren]        # noodoplossing: alles apart
 
 
@@ -388,7 +445,12 @@ def genereer(db, tid, rng=None):
 
     t = toernooi(db, tid)
     teams = deelnemers(db, tid)
-    pot_van = potten_verdelen(teams, t["potten"], rng)
+    # Staat iedereen op dezelfde rating — het geval bij een eerste toernooi — dan
+    # zeggen potten niets: elke indeling is dan even willekeurig. We loten dan
+    # gewoon vrij en laten de potten uit beeld, in plaats van de zaal een
+    # rangschikking voor te schotelen die nergens op slaat.
+    aantal_potten = t["potten"] if potten_zinvol(teams) else 1
+    pot_van = potten_verdelen(teams, aantal_potten, rng)
     rng = rng or random.Random()
 
     try:
@@ -1236,9 +1298,12 @@ def evalueer(db, tid):
                     meldingen.append(
                         f"De shootouts zijn opnieuw bepaald: {aantal} wedstrijd(en) "
                         f"tussen {len(nodig)} teams die gelijk staan.")
-                else:
-                    meldingen.append("Er zijn geen shootouts meer nodig.")
-                return meldingen
+                    return meldingen
+                # Er valt niets meer te beslissen. Meteen doorgaan naar het
+                # knockoutschema: anders blijft het toernooi in de bracketfase
+                # hangen zonder dat er nog iets te spelen valt.
+                meldingen.append("Er zijn geen shootouts meer nodig.")
+                return evalueer(db, tid) + meldingen
         # Ligt het doorstoten intussen al vast? Dan hoeft de rest niet gespeeld.
         weg = _wis_zinloze_shootouts(db, tid)
         if weg:

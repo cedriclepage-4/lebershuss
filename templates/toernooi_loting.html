@@ -4,12 +4,13 @@
 
 <section class="held loting-held">
   <h1>De loting van {{ t['name'] }}</h1>
-  <p>De potten en alle gelote affiches van de bracketfase.</p>
+  <p>{% if potten_getoond %}De potten en alle{% else %}Alle{% endif %} gelote affiches van de bracketfase.</p>
   <p class="ruimte-boven">
     <a class="knop" href="{{ url_for('toernooi_detail', toernooi_id=t['id']) }}">Terug naar het toernooi</a>
   </p>
 </section>
 
+{% if potten_getoond %}
 <h2 class="sectiekop">De potten</h2>
 <div class="potten-raster">
   {% for pot in potten %}
@@ -27,6 +28,15 @@
   </div>
   {% endfor %}
 </div>
+{% else %}
+<div class="kaart leeg">
+  <p>Er is vrij geloot.</p>
+  <p class="klein-tekst">Alle teams staan op dezelfde rating, dus valt er niets te
+     spreiden: er is een willekeurige loting gemaakt. Vanaf het moment dat
+     de ratings uiteenlopen, worden de sterkste teams over potten verdeeld
+     zodat ze elkaar niet meteen in de eerste ronde tegenkomen.</p>
+</div>
+{% endif %}
 
 <h2 class="sectiekop">De affiches</h2>
 {% for ronde in rondes %}
@@ -35,13 +45,13 @@
   {% for a in ronde.affiches %}
   <div class="kaart affiche-kaart">
     <div class="affiche-kant">
-      <span class="pot-pil pot-{{ a.a_pot }}">Pot {{ a.a_pot }}</span>
+      {% if potten_getoond %}<span class="pot-pil pot-{{ a.a_pot }}">Pot {{ a.a_pot }}</span>{% endif %}
       <span class="affiche-naam">{{ a.a }}</span>
       <span class="klein-tekst stil">{{ a.a_elo }} ELO</span>
     </div>
     <div class="affiche-vs">VS</div>
     <div class="affiche-kant">
-      <span class="pot-pil pot-{{ a.b_pot }}">Pot {{ a.b_pot }}</span>
+      {% if potten_getoond %}<span class="pot-pil pot-{{ a.b_pot }}">Pot {{ a.b_pot }}</span>{% endif %}
       <span class="affiche-naam">{{ a.b }}</span>
       <span class="klein-tekst stil">{{ a.b_elo }} ELO</span>
     </div>
