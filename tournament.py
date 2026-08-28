@@ -782,13 +782,25 @@ def _orden_groep(groep, bracket, shootouts, onbesliste_groepen, tid):
         return (-(h2h[r["team_id"]]), -r.get("kwaliteit", 0), -r.get("programma", 0))
 
     def sleutel(r):
-        # Pas daarna de shootout: wie won staat bovenaan, wie niet hoefde te
-        # spelen ertussen, wie verloor onderaan. Blijft het dan nog gelijk, dan
-        # rest enkel de toernooikracht en de loting.
-        return rekenwerk(r) + (-(so[r["team_id"]]), so_verlies[r["team_id"]],
-                               -r.get("kracht", 0.0), lot_sleutel(tid, r["team_id"]))
+        # De volgorde zonder shootouts: eerst het rekenwerk, dan de
+        # toernooikracht en ten slotte de loting.
+        return rekenwerk(r) + (-r.get("kracht", 0.0), lot_sleutel(tid, r["team_id"]))
 
     gesorteerd = sorted(groep, key=sleutel)
+
+    # De shootout verdeelt enkel de plaatsen waar hij over gaat. Wie niet hoefde
+    # te spelen, houdt de plaats die hij al had: hij is net vrijgesteld ómdat die
+    # plaats vastlag, en dan hoort hij er ook niet onder te zakken omdat anderen
+    # een beslissingswedstrijd wonnen. De deelnemers worden dus onderling
+    # herschikt binnen de plaatsen die zij samen bezetten — winnaars bovenaan.
+    speelde = [i for i, r in enumerate(gesorteerd)
+               if so[r["team_id"]] or so_verlies[r["team_id"]]]
+    if speelde:
+        herschikt = sorted((gesorteerd[i] for i in speelde),
+                           key=lambda r: (-(so[r["team_id"]]), so_verlies[r["team_id"]],
+                                          sleutel(r)))
+        for plaats, r in zip(speelde, herschikt):
+            gesorteerd[plaats] = r
 
     # Er komt hoogstens ÉÉN shootoutronde per puntengroep. Is die gespeeld, dan
     # ligt de volgorde vast — ook voor wie niet meespeelde. Zo weet de zaal
@@ -925,8 +937,8 @@ def tiebreak_groepen(db, tid):
             status, uitleg = "shootout_klaar", (
                 "Het rekenwerk bracht deze groep tot aan de streep, maar kon de "
                 "ploegen op de streep zelf niet scheiden. Daar besliste een shootout "
-                "wie het laatste ticket pakt. Erboven en eronder bepalen de kwaliteit "
-                "van de overwinningen en het programma de volgorde.")
+                "wie het laatste ticket pakt. De shootout verdeelt enkel díe plaatsen: "
+                "wie niet hoefde te spelen, houdt de plaats die hij al had.")
         elif len({r.get("kwaliteit", 0) for r in rijen}) > 1:
             status, uitleg = "kwaliteit", (
                 "De kwaliteit van de overwinningen beslist: de som van de punten van "

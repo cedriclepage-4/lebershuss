@@ -191,12 +191,8 @@ def test_sluitend(vormen):
 CRITERIA = ["onderling", "kwaliteit", "programma", "shootout", "kracht", "loting"]
 
 
-def groepssleutel(db, groep_ids):
-    """De ketting als sorteersleutel, los van de implementatie opgebouwd.
-
-    punten → onderling → kwaliteit → programma → shootout → kracht → loting.
-    Het onderlinge duel telt enkel mee als de mini-tabel compleet is.
-    """
+def groepsgegevens(db, groep_ids):
+    """De ruwe cijfers per team, los van de implementatie opgehaald."""
     bracket = tm.games_van(db, 1, "bracket")
     shootouts = tm.games_van(db, 1, "shootout")
     h2h, _ = (tm._mini_punten(bracket, groep_ids) if tm._volledig_onderling(bracket, groep_ids)
@@ -204,23 +200,52 @@ def groepssleutel(db, groep_ids):
     so, _ = tm._mini_punten(shootouts, groep_ids)
     so_v = tm._mini_verlies(shootouts, groep_ids)
 
-    def sleutel(r):
-        # Eén element per criterium, in dezelfde volgorde als CRITERIA, zodat de
-        # sleutel én sorteert én netjes te benoemen valt. De shootout telt als
-        # één criterium met twee cijfers: gewonnen eerst, verloren laatst.
+    def zonder_shootout(r):
+        """punten → onderling → kwaliteit → programma → kracht → loting."""
         t = r["team_id"]
-        return (-h2h[t], -r["kwaliteit"], -r["programma"], (-so[t], so_v[t]),
+        return (-h2h[t], -r["kwaliteit"], -r["programma"],
                 -round(r["kracht"], 6), tm.lot_sleutel(1, t))
-    return sleutel
+
+    return h2h, so, so_v, zonder_shootout
+
+
+def verwachte_volgorde(db, groep):
+    """Bouw de verwachte volgorde na, onafhankelijk van `_orden_groep`.
+
+    Eerst de ketting zónder shootouts. Daarna herverdeelt de shootout enkel de
+    plaatsen van de ploegen die hem speelden: winnaars bovenaan, en wie niet
+    speelde blijft staan waar hij stond.
+    """
+    ids = {r["team_id"] for r in groep}
+    _, so, so_v, zonder = groepsgegevens(db, ids)
+    rij = sorted(groep, key=zonder)
+    plekken = [i for i, r in enumerate(rij)
+               if so[r["team_id"]] or so_v[r["team_id"]]]
+    if plekken:
+        deelnemers = sorted((rij[i] for i in plekken),
+                            key=lambda r: (-so[r["team_id"]], so_v[r["team_id"]],
+                                           zonder(r)))
+        for i, r in zip(plekken, deelnemers):
+            rij[i] = r
+    return [r["team_id"] for r in rij]
 
 
 def eerste_verschil(db, a, b, groep_ids):
-    """Op welk criterium worden deze twee buren écht gescheiden?"""
-    sleutel = groepssleutel(db, groep_ids)
-    ka, kb = sleutel(a), sleutel(b)
-    for naam, x, y in zip(CRITERIA, ka, kb):
-        if x != y:
-            return naam
+    """Op welk criterium worden deze twee buren gescheiden?"""
+    h2h, so, so_v, zonder = groepsgegevens(db, groep_ids)
+    ta, tb = a["team_id"], b["team_id"]
+    if h2h[ta] != h2h[tb]:
+        return "onderling"
+    if a["kwaliteit"] != b["kwaliteit"]:
+        return "kwaliteit"
+    if a["programma"] != b["programma"]:
+        return "programma"
+    speelde_a = bool(so[ta] or so_v[ta])
+    speelde_b = bool(so[tb] or so_v[tb])
+    if speelde_a and speelde_b and (so[ta], so_v[ta]) != (so[tb], so_v[tb]):
+        return "shootout"
+    if round(a["kracht"], 6) != round(b["kracht"], 6):
+        return "kracht"
     return "loting"
 
 
@@ -249,16 +274,12 @@ def test_uitleg(vormen):
             ids = {r["team_id"] for r in groep}
             for reden in (eerste_verschil(db, a, b, ids) for a, b in zip(groep, groep[1:])):
                 gezien[reden] += 1
-            # De échte controle: de getoonde volgorde moet exact de volgorde van
-            # de ketting zijn. Eén onafhankelijk opgebouwde sleutel, en die moet
-            # oplopen van boven naar onder.
-            sleutel = groepssleutel(db, ids)
-            sleutels = [sleutel(r) for r in groep]
-            for (ka, a), (kb, b) in zip(zip(sleutels, groep), zip(sleutels[1:], groep[1:])):
-                meld(ka <= kb,
-                     f"n={n} zaad={zaad}: T{a['team_id']:02d} staat boven "
-                     f"T{b['team_id']:02d} maar verliest op de ketting "
-                     f"({ka} vs {kb})")
+            # De échte controle: de getoonde volgorde moet exact overeenkomen met
+            # de volgorde die de ketting voorschrijft, hier los nagebouwd.
+            echt = [r["team_id"] for r in groep]
+            meld(echt == verwachte_volgorde(db, groep),
+                 f"n={n} zaad={zaad}: groep op {groep[0]['punten']} punten staat als "
+                 f"{echt}, verwacht {verwachte_volgorde(db, groep)}")
         TEL["uitleg"] += 1
         db.close()
         os.remove(pad)
@@ -326,18 +347,25 @@ def test_vrijstelling(vormen):
         if not open_g or len(open_g) > 6:
             db.close(); os.remove(pad); continue
         spelers = {t for g in open_g for t in (g["team1_id"], g["team2_id"])}
-        voor = {r["team_id"]: r["doorstoot"] for r in tm.stand(db, 1)[0]}
+        voor = {r["team_id"]: (r["doorstoot"], r["positie"]) for r in tm.stand(db, 1)[0]}
         keuzes = [(g["team1_id"], g["team2_id"]) for g in open_g]
         for combinatie in itertools.product(*keuzes):
             hyp = {g["id"]: w for g, w in zip(open_g, combinatie)}
-            na = {r["team_id"]: r["doorstoot"] for r in tm.stand(db, 1, hyp)[0]}
+            na = {r["team_id"]: (r["doorstoot"], r["positie"])
+                  for r in tm.stand(db, 1, hyp)[0]}
             scenario_s += 1
-            for team, doorstoot in voor.items():
+            for team, (doorstoot, positie) in voor.items():
                 if team in spelers:
                     continue
-                meld(na[team] == doorstoot,
+                meld(na[team][0] == doorstoot,
                      f"n={n} zaad={zaad}: T{team:02d} speelt geen shootout maar gaat van "
-                     f"{'door' if doorstoot else 'uit'} naar {'door' if na[team] else 'uit'}")
+                     f"{'door' if doorstoot else 'uit'} naar {'door' if na[team][0] else 'uit'}")
+                # Sterker nog: ook zijn plaats hoort onaangeroerd te blijven. Een
+                # vrijgestelde ploeg mag niet zakken omdat anderen hun shootout
+                # wonnen — dat zou haar ook een zwaardere knockoutloting geven.
+                meld(na[team][1] == positie,
+                     f"n={n} zaad={zaad}: T{team:02d} speelt geen shootout maar zakt van "
+                     f"plaats {positie} naar {na[team][1]}")
         TEL["vrijstelling"] += 1
         db.close()
         os.remove(pad)
