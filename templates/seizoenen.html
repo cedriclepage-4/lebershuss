@@ -3,9 +3,11 @@
 {% block inhoud %}
 
 <section class="held">
-  <h1>Seizoenen</h1>
-  <p>De competitie wordt gespeeld in seizoenen met vaste speeldagen. Hier vind je
-     het lopende seizoen én de eregalerij van alle voorbije seizoenen.</p>
+  <h1>Alle seizoenen</h1>
+  <p>De league wordt gespeeld in seizoenen met vaste speeldagen. Klik op een seizoen
+     voor het klassement, de eregalerij en alle wedstrijden ervan. Elk seizoen begint
+     voor iedereen opnieuw op {{ start_elo }} Aura — de
+     <a class="profiel-link" href="{{ url_for('index') }}">globale Aura</a> loopt gewoon door.</p>
 </section>
 
 {% if lijst %}

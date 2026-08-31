@@ -5,7 +5,7 @@
 <section class="held">
   <h1>Instellingen</h1>
   <p>De knoppen die je zelden nodig hebt: welke delen van de site openstaan,
-     ELO-parameters en het volledig herberekenen van alle ratings.</p>
+     Aura-parameters en het volledig herberekenen van alle ratings.</p>
 </section>
 
 {% include "_admin_nav.html" %}
@@ -95,7 +95,7 @@
   <h3>Alleen de geschiedenis wissen</h3>
   <p class="stil klein-tekst">Wist alle <strong>wedstrijden, toernooien, seizoenen en
      ratings</strong>. Spelers, teams, accounts en rangen blijven staan, en iedereen
-     begint weer op {{ start_elo }} ELO. Zo start je een nieuw seizoen met dezelfde bende.</p>
+     begint weer op {{ start_elo }} Aura. Zo start je een nieuw seizoen met dezelfde bende.</p>
   <form method="post" action="{{ url_for('database_legen') }}">
     <input type="hidden" name="omvang" value="geschiedenis">
     <div class="rij-form">
@@ -128,11 +128,11 @@
 
 <div class="stat-raster">
   <div class="kaart">
-    <h3>ELO-parameters</h3>
+    <h3>Aura-parameters</h3>
     <p class="stil klein-tekst">De K-factor bepaalt hoe hard één wedstrijd doorweegt.
        Toernooiwedstrijden krijgen automatisch een lager of hoger gewicht naargelang
        de fase (bracket ×0,75 tot finale ×2). In de knockout betaalt de verliezer
-       maar de helft, zodat ver geraken je nooit ELO kost.</p>
+       maar de helft, zodat ver geraken je nooit Aura kost.</p>
     <form method="post" action="{{ url_for('instellingen_opslaan') }}"
           data-confirm="K-factoren wijzigen? Alle ratings worden herberekend.">
       <label>K-factor spelers
@@ -159,7 +159,7 @@
 <div class="kaart">
   <h3>Alles herberekenen</h3>
   <p class="stil klein-tekst">Speelt elke gespeelde wedstrijd chronologisch opnieuw af en
-     berekent zo de permanente ELO, alle seizoens-ELO's en de toernooistanden opnieuw.
+     berekent zo de permanente Aura, alle seizoens-Aura's en de toernooistanden opnieuw.
      Handig als er iets niet lijkt te kloppen — je kan er niets mee stukmaken.</p>
   <form method="post" action="{{ url_for('herberekenen') }}">
     <button type="submit" class="knop">🔄 Alle ratings herberekenen</button>

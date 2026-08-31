@@ -465,7 +465,7 @@ conn.execute("UPDATE players SET role ='eigenaar' WHERE id = 1")
 conn.commit()
 with klant.session_transaction() as s:
     s["speler_id"] = 1
-for pad in ["/", "/wedstrijden", "/statistieken", "/seizoenen", "/seizoen/1",
+for pad in ["/", "/statistieken", "/seizoenen", "/seizoen/1",
             "/speler/1", "/team/1", "/toernooien", "/toernooi/1", "/toernooi/1/loting",
             "/admin", "/admin/spelers", "/admin/toernooi/1"]:
     antwoord = klant.get(pad)
@@ -480,7 +480,10 @@ check(klant.get("/admin/spelers").status_code == 302,
 
 # ------------------------------------------------- league aan en uit --
 print("\n== Leaguegedeelte aan- en uitzetten ==")
-LEAGUE_PADEN = ["/", "/wedstrijden", "/statistieken", "/seizoenen", "/seizoen/1"]
+# Enkel deze horen bij de league; Home (/) en de statistieken gaan over álle
+# wedstrijden en blijven dus altijd bereikbaar.
+LEAGUE_PADEN = ["/seizoenen", "/seizoen/1"]
+ALTIJD_OPEN = ["/", "/statistieken", "/toernooien"]
 
 
 def zet_league(aan):
@@ -492,11 +495,15 @@ def zet_league(aan):
 zet_league(False)      # speler_id 1 is hier een gewone speler
 check(all(klant.get(p).status_code == 302 for p in LEAGUE_PADEN),
       "met de league uit komt een speler op geen enkele leaguepagina")
-check(klant.get("/").headers["Location"].endswith("/toernooien"),
-      "de startpagina wordt dan de toernooipagina")
-check(klant.get("/toernooien").status_code == 200, "het toernooi blijft gewoon open")
-check("sectie-keuze" not in klant.get("/toernooien").get_data(as_text=True),
-      "de keuzebalk League/Toernooi verdwijnt")
+check(klant.get("/seizoenen").headers["Location"].endswith("/"),
+      "hij belandt dan op de thuispagina")
+check(all(klant.get(p).status_code == 200 for p in ALTIJD_OPEN),
+      "Home, statistieken en toernooi blijven gewoon open")
+thuis = klant.get("/").get_data(as_text=True)
+check("Globaal klassement" in thuis, "de thuispagina toont het globale klassement")
+check(">🏆</span> League" not in thuis, "de Leagueknop verdwijnt uit de balk")
+check(">🏠</span> Home" in thuis and ">🥇</span> Toernooi" in thuis,
+      "Home en Toernooi blijven wel staan")
 
 conn.execute("UPDATE players SET role = 'eigenaar' WHERE id = 1")
 conn.commit()
@@ -508,8 +515,9 @@ conn.execute("UPDATE players SET role = 'speler' WHERE id = 1")
 conn.commit()
 check(all(klant.get(p).status_code == 200 for p in LEAGUE_PADEN),
       "met de league aan ziet iedereen ze weer")
-check("sectie-keuze" in klant.get("/toernooien").get_data(as_text=True),
-      "en is de keuzebalk League/Toernooi terug")
+thuis = klant.get("/").get_data(as_text=True)
+check(">🏆</span> League" in thuis, "en staat de Leagueknop weer in de balk")
+check(thuis.count("sectie-knop") == 3, "er zijn dan drie tabbladen")
 
 # --------------------------------------------- accounts opeisen (claim) --
 print("\n== Accounts opeisen ==")

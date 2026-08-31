@@ -19,6 +19,7 @@ import re
 import secrets
 import sqlite3
 import time
+from urllib.parse import urlparse
 from collections import defaultdict
 from datetime import date, datetime
 from functools import wraps
@@ -255,11 +256,11 @@ def herbereken_alles(db):
 
     Er worden twee soorten ratings berekend:
 
-    * de **permanente ELO** (`players.elo` / `teams.elo`): álle wedstrijden
+    * de **permanente Aura** (`players.elo` / `teams.elo`): álle wedstrijden
       tellen mee, league én toernooi. Toernooiwedstrijden wegen zwaarder naarmate
       een team verder geraakt (zie `elo.fase_factor`). Shootouts tellen niet mee:
       die beslissen enkel wie doorstoot.
-    * de **seizoens-ELO** (`season_ratings`): per seizoen apart, iedereen start
+    * de **seizoens-Aura** (`season_ratings`): per seizoen apart, iedereen start
       er opnieuw op 1000, en enkel ligawedstrijden van dat seizoen tellen mee.
     """
     k_s = float(instelling(db, "k_speler", "32"))
@@ -296,7 +297,7 @@ def herbereken_alles(db):
         winnaar = 1 if w["winner_team_id"] == t1 else 2
         f = fase_factor(w["fase"], w["ronde"])
         # In de knockout betaalt de verliezer maar een deel: zo kost ver
-        # geraken nooit ELO. Zie de uitleg bij KO_VERLIES in elo.py.
+        # geraken nooit Aura. Zie de uitleg bij KO_VERLIES in elo.py.
         f_verlies = fase_factor(w["fase"], w["ronde"], verloren=True)
         deel = (f_verlies / f) if f else 1.0
 
@@ -332,7 +333,7 @@ def herbereken_alles(db):
 
 
 def _herbereken_seizoen(db, seizoen_id, team_leden, k_s, k_t):
-    """Seizoens-ELO: iedereen start op 1000, enkel ligawedstrijden tellen mee."""
+    """Seizoens-Aura: iedereen start op 1000, enkel ligawedstrijden tellen mee."""
     sp, tm = {}, {}
     telling = defaultdict(lambda: {"gespeeld": 0, "winst": 0})
 
@@ -402,7 +403,7 @@ def na_resultaat(db, game_id=None):
 
 
 def seizoen_klassement(db, seizoen_id):
-    """Klassement binnen één seizoen (seizoens-ELO, iedereen startte op 1000)."""
+    """Klassement binnen één seizoen (seizoens-Aura, iedereen startte op 1000)."""
     spelers = db.execute(f"""
         SELECT sr.*, {WEERGAVE} AS naam, p.avatar, p.id AS pid
         FROM season_ratings sr
@@ -510,7 +511,7 @@ def rangverdeling(db):
 
 
 def elo_verloop(db, entity_id, entity_type="speler"):
-    """Punten voor de ELO-grafiek: na elke wedstrijd de nieuwe ELO + positie.
+    """Punten voor de Aura-grafiek: na elke wedstrijd de nieuwe Aura + positie.
 
     Werkt zowel voor een speler als voor een team: de plaats in het klassement
     wordt telkens berekend binnen de eigen soort (spelers onder spelers, teams
@@ -661,16 +662,19 @@ def speler_wedstrijd_meldingen(db, speler_id, toernooi_id=None, alleen_liga=Fals
                             "WHERE game_id = ? AND player_id IN (?, ?)",
                             (g_["id"], *lid_ids)):
             waarden[r["player_id"]][r["stat_type_id"]] = r["value"]
+        # Nog een vroegere wedstrijd open? Dan tonen we deze wel, maar op slot.
+        vorige = toernooi_motor.eerdere_wedstrijd(db, g_)
         items.append({"game": g_, "eigen_team": eigen_team, "tegen_team": tegen_team,
                       "eigen": eigen, "tegen": tegen, "conflict": conflict,
                       "leden": leden, "waarden": waarden,
                       "context": wedstrijd_context(g_),
+                      "wacht_op": vorige,
                       "heeft_waarden": any(waarden.values())})
     return items
 
 
 def seizoen_historiek(db, entity_id, entity_type="speler"):
-    """Per seizoen: eindplaats in het seizoensklassement, cijfers en ELO.
+    """Per seizoen: eindplaats in het seizoensklassement, cijfers en Aura.
 
     Werkt zowel voor een speler als voor een team; de plaats is telkens die
     binnen het klassement van zijn eigen soort.
@@ -874,7 +878,7 @@ def liga_records(db):
         WHERE rh.entity_type = 'speler' AND rh.scope = 'permanent'
     """).fetchone()
     if piek and piek["pid"] is not None:
-        records.append({"emoji": "🚀", "titel": "Hoogste ELO ooit",
+        records.append({"emoji": "🚀", "titel": "Hoogste Aura ooit",
                         "waarde": f"{piek['v']:.0f}",
                         "houders": speler_links([piek["pid"]])})
 
@@ -885,7 +889,7 @@ def liga_records(db):
         WHERE rh.entity_type = 'speler' AND rh.scope = 'permanent'
     """).fetchone()
     if sprong and sprong["pid"] is not None and sprong["v"] and sprong["v"] > 0:
-        records.append({"emoji": "📈", "titel": "Grootste ELO-sprong",
+        records.append({"emoji": "📈", "titel": "Grootste Aura-sprong",
                         "waarde": f"+{sprong['v']:.0f} in één wedstrijd",
                         "houders": speler_links([sprong["pid"]])})
 
@@ -901,7 +905,7 @@ def liga_records(db):
 
 
 def seizoen_stats(db, seizoen_id):
-    """Ereborden van één seizoen: overwinningen en ELO-klim, spelers en teams."""
+    """Ereborden van één seizoen: overwinningen en Aura-klim, spelers en teams."""
     rijen = db.execute("""
         SELECT g.id, g.winner_team_id, g.team1_id, g.team2_id,
                t1.player1_id AS a1, t1.player2_id AS a2,
@@ -948,7 +952,7 @@ def seizoen_stats(db, seizoen_id):
                      if pid in namen_sp]
     spelers_klim = [{"naam": namen_sp[pid],
                      "url": url_for("speler_profiel", speler_id=pid),
-                     "waarde": f"{'+' if d >= 0 else ''}{d:.0f} ELO"}
+                     "waarde": f"{'+' if d >= 0 else ''}{d:.0f} Aura"}
                     for pid, d in sorted(klim["speler"].items(), key=lambda kv: -kv[1])[:5]
                     if pid in namen_sp]
     teams_winst = [{"naam": namen_tm[tid],
@@ -958,7 +962,7 @@ def seizoen_stats(db, seizoen_id):
                    if tid in namen_tm]
     teams_klim = [{"naam": namen_tm[tid],
                    "url": url_for("team_profiel", team_id=tid),
-                   "waarde": f"{'+' if d >= 0 else ''}{d:.0f} ELO"}
+                   "waarde": f"{'+' if d >= 0 else ''}{d:.0f} Aura"}
                   for tid, d in sorted(klim["team"].items(), key=lambda kv: -kv[1])[:3]
                   if tid in namen_tm]
 
@@ -1009,7 +1013,7 @@ def filter_elo(waarde):
 
 @app.template_filter("kracht")
 def filter_kracht(waarde):
-    """Toernooikracht: de ELO die je vanavond won of verloor, mét teken.
+    """Toernooikracht: de Aura die je vanavond won of verloor, mét teken.
 
     Twee cijfers na de komma: dit staat er enkel als het cijfer de volgorde
     bepaalt, en dan mogen twee ploegen die net niet gelijk staan er niet gelijk
@@ -1092,19 +1096,111 @@ def league_vereist(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         if not league_toegankelijk():
-            return redirect(url_for("toernooien"))
+            return redirect(url_for("index"))
         return f(*args, **kwargs)
     return wrapper
+
+
+# Waar hoort een detailpagina onder? Die bestemming is het vangnet van de
+# terugknop: op een gsm is de knop van de browser lastig te vinden, en wie via
+# een QR-code of een gedeelde link binnenkomt heeft helemaal geen geschiedenis.
+# Met JavaScript gaat de knop gewoon één stap terug; zonder (of bij een directe
+# link) belandt hij hier.
+_TERUG_REGELS = [
+    (re.compile(r"^/seizoen/\d+"), "seizoenen", "Alle seizoenen"),
+    (re.compile(r"^/toernooi/\d+"), "toernooien", "Alle toernooien"),
+    (re.compile(r"^/speler/\d+"), "index", "Klassement"),
+    (re.compile(r"^/team/\d+"), "index", "Klassement"),
+    (re.compile(r"^/claimen/\d+"), "claimen", "Kies je naam"),
+    (re.compile(r"^/admin/seizoen/\d+"), "admin_seizoenen", "Alle seizoenen"),
+    (re.compile(r"^/admin/toernooi/\d+"), "admin_toernooien", "Alle toernooien"),
+]
+
+
+# Hoe heet de pagina waar je vandaan komt? Kort en herkenbaar; de knop moet in
+# één oogopslag duidelijk maken waar hij je heen brengt.
+_PAGINA_NAMEN = [
+    (re.compile(r"^/$"), "Klassement"),
+    (re.compile(r"^/statistieken"), "Statistieken"),
+    (re.compile(r"^/seizoenen"), "Alle seizoenen"),
+    (re.compile(r"^/seizoen/\d+"), "Seizoen"),
+    (re.compile(r"^/toernooien"), "Alle toernooien"),
+    (re.compile(r"^/toernooi/\d+/loting"), "Loting"),
+    (re.compile(r"^/toernooi/\d+"), "Toernooi"),
+    (re.compile(r"^/speler/\d+"), "Spelersprofiel"),
+    (re.compile(r"^/team/\d+"), "Teamprofiel"),
+    (re.compile(r"^/claimen"), "Accounts opeisen"),
+    (re.compile(r"^/inloggen"), "Inloggen"),
+    (re.compile(r"^/registreren"), "Registreren"),
+    (re.compile(r"^/admin/seizoen/\d+"), "Seizoen beheren"),
+    (re.compile(r"^/admin/seizoenen"), "Alle seizoenen"),
+    (re.compile(r"^/admin/toernooi/\d+"), "Toernooi beheren"),
+    (re.compile(r"^/admin/toernooien"), "Alle toernooien"),
+    (re.compile(r"^/admin/spelers"), "Spelers & teams"),
+    (re.compile(r"^/admin/klassement"), "Rangen & statistieken"),
+    (re.compile(r"^/admin/instellingen"), "Instellingen"),
+    (re.compile(r"^/admin"), "Organisatie"),
+]
+
+
+def _vorige_pagina(huidig_pad):
+    """Het pad van de vorige pagina op deze site, of None.
+
+    Enkel een verwijzer van onze eigen site telt, en nooit de pagina zelf: na
+    het opslaan van een formulier wijst de verwijzer namelijk naar de pagina
+    waar je al staat.
+    """
+    verwijzer = request.referrer if request else None
+    if not verwijzer:
+        return None
+    stuk = urlparse(verwijzer)
+    if stuk.netloc and stuk.netloc != urlparse(request.host_url).netloc:
+        return None                       # van een andere site: negeren
+    pad = stuk.path + (f"?{stuk.query}" if stuk.query else "")
+    if not pad.startswith("/") or pad.startswith("//"):
+        return None
+    return None if stuk.path == huidig_pad else pad
+
+
+def _terugknop(pad):
+    """De terugknop voor deze pagina, of None op een hoofdpagina.
+
+    De knop brengt je naar de pagina waar je vandaan kwam, en zegt dat er ook
+    bij. Kwam je hier rechtstreeks binnen (QR-code, gedeelde link, nieuw
+    tabblad), dan valt hij terug op de overzichtspagina waar deze pagina onder
+    hoort — anders zou de knop nergens heen kunnen.
+    """
+    for patroon, endpoint, label in _TERUG_REGELS:
+        if patroon.match(pad):
+            vorige = _vorige_pagina(pad)
+            if vorige:
+                for herken, naam in _PAGINA_NAMEN:
+                    if herken.match(vorige):
+                        return {"url": vorige, "label": naam}
+                return {"url": vorige, "label": "Vorige pagina"}
+            try:
+                return {"url": url_for(endpoint), "label": label}
+            except Exception:
+                return None
+    return None
 
 
 @app.context_processor
 def extra_context():
     naam = "logo.png" if os.path.exists(os.path.join(STATIC_MAP, "logo.png")) else "logo.svg"
     pad = request.path if request else "/"
-    league_uit = not league_zichtbaar()
-    # Zonder league is er maar één deel; dan is alles wat geen toernooi is
-    # (profielen, inloggen …) toch onder "toernooi" te vinden.
-    sectie = "toernooi" if (pad.startswith("/toernooi") or league_uit) else "liga"
+    # Drie delen: Home (globaal klassement en statistieken), League (seizoenen)
+    # en Toernooi. Een pagina die bij géén van drieën hoort — een profiel,
+    # inloggen, het organisatiepaneel — laat alle drie de knoppen dof en toont
+    # geen subnavigatie: anders lijkt het alsof je nog in dat deel zit.
+    if pad.startswith("/toernooi"):
+        sectie = "toernooi"
+    elif pad.startswith("/seizoen"):
+        sectie = "liga"
+    elif pad == "/" or pad.startswith("/statistieken"):
+        sectie = "home"
+    else:
+        sectie = None
     # De balk met je eerstvolgende wedstrijd: enkel voor wie ingelogd is, en niet
     # bij statische bestanden (die hoeven geen databasevraag).
     nu_spelen = None
@@ -1115,7 +1211,7 @@ def extra_context():
         except Exception:
             nu_spelen = None            # nooit een pagina laten crashen hierdoor
 
-    return {"logo_bestand": naam, "sectie": sectie,
+    return {"logo_bestand": naam, "sectie": sectie, "terug": _terugknop(pad),
             "league_zichtbaar": league_zichtbaar(),
             "league_toegankelijk": league_toegankelijk(),
             "claim_venster_open": claim_open(),
@@ -1179,16 +1275,15 @@ def manifest():
     """Het manifest maakt de site installeerbaar als app op de gsm.
 
     We serveren het via een route (en niet als vast bestand), omdat de
-    startpagina afhangt van de instellingen: staat de league uit, dan is dat de
-    toernooipagina. Een start_url die doorverwijst, keurt Chrome soms af — dan
-    verschijnt de installatieknop niet.
+    snelkoppelingen afhangen van de instellingen: staat de league uit, dan
+    hebben snelkoppelingen naar seizoenen geen zin. De startpagina is altijd de
+    thuispagina — die staat los van league én toernooi.
     """
     with open(os.path.join(STATIC_MAP, "manifest.webmanifest"), encoding="utf-8") as f:
         gegevens = json.load(f)
-    start = "/" if league_zichtbaar() else url_for("toernooien")
-    gegevens["start_url"] = start
+    gegevens["start_url"] = "/"
     gegevens["shortcuts"] = [s for s in gegevens.get("shortcuts", [])
-                             if league_zichtbaar() or s["url"] != "/"]
+                             if league_zichtbaar() or not s["url"].startswith("/seizoen")]
     antwoord = app.response_class(json.dumps(gegevens, ensure_ascii=False, indent=2),
                                   mimetype="application/manifest+json")
     antwoord.headers["Cache-Control"] = "no-cache"
@@ -1206,9 +1301,12 @@ def media(bestand):
 
 @app.route("/")
 def index():
-    if not league_toegankelijk():
-        # Zonder league is de toernooipagina de thuispagina.
-        return redirect(url_for("toernooien"))
+    """Thuispagina: het globale klassement over álles wat ooit gespeeld is.
+
+    Dit staat los van league én toernooi — de permanente Aura telt alle
+    wedstrijden mee — en is dus ook zichtbaar wanneer het leaguegedeelte
+    verborgen is.
+    """
     db = get_db()
     sp_stats, tm_stats = speel_statistieken(db)
     rangen = alle_rangen(db)
@@ -1242,56 +1340,27 @@ def index():
         "SELECT COUNT(*) AS n FROM games WHERE status = 'gespeeld' "
         "AND fase != 'shootout'").fetchone()["n"]
 
+    # Is er een toernooi bezig? Dat is op zo'n avond het eerste wat men zoekt.
+    lopend = db.execute("""
+        SELECT * FROM tournaments WHERE status IN ('bracket', 'knockout')
+        ORDER BY date DESC LIMIT 1
+    """).fetchone()
+    if lopend is None:
+        lopend = db.execute("""
+            SELECT * FROM tournaments WHERE status = 'opzet' AND date >= ?
+            ORDER BY date LIMIT 1
+        """, (date.today().isoformat(),)).fetchone()
+
     return render_template("index.html", spelers=spelers, teams=teams,
                            aantal_spelers=len(spelers), aantal_teams=len(teams),
-                           aantal_gespeeld=aantal_gespeeld)
-
-
-@app.route("/wedstrijden")
-@league_vereist
-def wedstrijden():
-    db = get_db()
-    namen = teamnamen(db)
-
-    gepland = db.execute(
-        "SELECT * FROM games WHERE status = 'gepland' AND tournament_id IS NULL "
-        "ORDER BY scheduled_at").fetchall()
-    gespeeld = db.execute(
-        "SELECT * FROM games WHERE status = 'gespeeld' AND tournament_id IS NULL "
-        "ORDER BY played_at DESC, id DESC").fetchall()
-
-    deltas = {}
-    for r in db.execute("SELECT game_id, entity_id, elo_voor, elo_na FROM rating_history "
-                        "WHERE entity_type = 'team' AND scope = 'permanent'"):
-        deltas[(r["game_id"], r["entity_id"])] = r["elo_na"] - r["elo_voor"]
-
-    speeldag_labels = {}
-    for r in db.execute("""
-        SELECT g.id, md.title, s.name AS seizoen
-        FROM games g
-        JOIN matchdays md ON md.id = g.matchday_id
-        JOIN seasons s ON s.id = md.season_id
-    """):
-        speeldag_labels[r["id"]] = f'{r["title"]} · {r["seizoen"]}'
-
-    stats_per_game = defaultdict(list)
-    for r in db.execute(f"""
-        SELECT gs.game_id, {WEERGAVE} AS speler, st.name AS stat, st.unit, gs.value
-        FROM game_stats gs
-        JOIN players p ON p.id = gs.player_id
-        JOIN stat_types st ON st.id = gs.stat_type_id
-        ORDER BY st.name, speler
-    """):
-        stats_per_game[r["game_id"]].append(r)
-
-    return render_template("wedstrijden.html", gepland=gepland, gespeeld=gespeeld,
-                           namen=namen, deltas=deltas, stats_per_game=stats_per_game,
-                           speeldag_labels=speeldag_labels)
+                           aantal_gespeeld=aantal_gespeeld, lopend=lopend,
+                           lopend_label=(TOERNOOI_STATUS.get(lopend["status"], ("", ""))
+                                         if lopend else None))
 
 
 @app.route("/statistieken")
-@league_vereist
 def statistieken():
+    """Records en statistiekenborden over álle wedstrijden — league én toernooi."""
     db = get_db()
     types = db.execute("SELECT * FROM stat_types WHERE active = 1 ORDER BY name").fetchall()
 
@@ -1331,7 +1400,7 @@ def seizoenen():
                       "speeldagen": speeldagen, "gespeeld": gespeeld,
                       "topklimmer": (stats["spelers_klim"][0] if stats and
                                      stats["spelers_klim"] else None)})
-    return render_template("seizoenen.html", lijst=lijst)
+    return render_template("seizoenen.html", lijst=lijst, start_elo=int(START_ELO))
 
 
 @app.route("/seizoen/<int:seizoen_id>")
@@ -1344,16 +1413,42 @@ def seizoen_detail(seizoen_id):
     namen = teamnamen(db)
 
     speeldagen = []
+    gepland = []
     for md in db.execute("SELECT * FROM matchdays WHERE season_id = ? ORDER BY date",
                          (seizoen_id,)):
         games = db.execute("SELECT * FROM games WHERE matchday_id = ? "
                            "ORDER BY scheduled_at", (md["id"],)).fetchall()
         speeldagen.append({"speeldag": md, "games": games})
+        gepland.extend(g for g in games if g["status"] == "gepland")
+    gepland.sort(key=lambda g: g["scheduled_at"] or "")
+
+    # Hoeveel Aura leverde elke wedstrijd op, en welke statistieken zijn er
+    # gemeld? Dat stond vroeger op een aparte wedstrijdpagina; het hoort thuis
+    # bij het seizoen waarin die wedstrijden gespeeld zijn.
+    deltas = {}
+    for r in db.execute("SELECT game_id, entity_id, elo_voor, elo_na FROM rating_history "
+                        "WHERE entity_type = 'team' AND scope = 'permanent'"):
+        deltas[(r["game_id"], r["entity_id"])] = r["elo_na"] - r["elo_voor"]
+
+    stats_per_game = defaultdict(list)
+    for r in db.execute(f"""
+        SELECT gs.game_id, {WEERGAVE} AS speler, st.name AS stat, st.unit, gs.value
+        FROM game_stats gs
+        JOIN players p ON p.id = gs.player_id
+        JOIN stat_types st ON st.id = gs.stat_type_id
+        JOIN games g ON g.id = gs.game_id
+        JOIN matchdays md ON md.id = g.matchday_id
+        WHERE md.season_id = ?
+        ORDER BY st.name, speler
+    """, (seizoen_id,)):
+        stats_per_game[r["game_id"]].append(r)
 
     sp_klassement, tm_klassement = seizoen_klassement(db, seizoen_id)
 
-    return render_template("seizoen.html", seizoen=seizoen,
+    return render_template("seizoen.html", seizoen=seizoen, huidig_seizoen=seizoen,
                            status=seizoen_status(seizoen), speeldagen=speeldagen,
+                           gepland=gepland, deltas=deltas,
+                           stats_per_game=stats_per_game,
                            namen=namen, stats=seizoen_stats(db, seizoen_id),
                            sp_klassement=sp_klassement, tm_klassement=tm_klassement)
 
@@ -1446,7 +1541,7 @@ def speler_profiel(speler_id):
     seizoen_ratings = seizoen_historiek(db, speler_id)
     toernooien_gespeeld = toernooi_historiek(db, speler_id)
 
-    # Toernooicijfers (tellen wel mee voor de permanente ELO).
+    # Toernooicijfers (tellen wel mee voor de permanente Aura).
     tn = db.execute("""
         SELECT COUNT(*) AS n,
                SUM(CASE WHEN g.winner_team_id =
@@ -1558,7 +1653,7 @@ def registreren():
                 db.commit()
                 session["speler_id"] = nummer
                 flash(f"Welkom bij Leberschuss Tonzent, {bijnaam or naam}! Je "
-                      f"spelersnummer is #{nummer} en je start op {START_ELO:.0f} ELO. "
+                      f"spelersnummer is #{nummer} en je start op {START_ELO:.0f} Aura. "
                       "Maak of aanvaard een team om mee te spelen.", "ok")
                 if eerste:
                     flash("Jij bent het eerste account en dus meteen de eigenaar van "
@@ -1904,6 +1999,17 @@ def wedstrijd_melden(game_id):
               "nog niet melden.", "fout")
         return redirect(terug)
 
+    # Op volgorde spelen: eerst je vorige wedstrijd afwerken. Dit geldt voor
+    # iedereen die meespeelt, ook voor een organisator — die heeft het
+    # organisatiepaneel als uitweg en hoeft hier geen voorrang te krijgen.
+    vorige = toernooi_motor.eerdere_wedstrijd(db, game)
+    if vorige is not None:
+        namen = teamnamen(db)
+        flash(f"Werk eerst je vorige wedstrijd af: {namen[vorige['team1_id']]} tegen "
+              f"{namen[vorige['team2_id']]} van {filter_datum(vorige['scheduled_at'])}. "
+              "De wedstrijden worden op volgorde gespeeld.", "fout")
+        return redirect(terug)
+
     eigen_team = game["team1_id"] if speler_id in (game["a1"], game["a2"]) else game["team2_id"]
     tegen_team = game["team2_id"] if eigen_team == game["team1_id"] else game["team1_id"]
 
@@ -1922,7 +2028,7 @@ def wedstrijd_melden(game_id):
             created_at = datetime('now', 'localtime')
     """, (game_id, eigen_team, speler_id, winnaar_team))
 
-    # Statistieken van het eigen team (beide spelers, optioneel, geen invloed op ELO).
+    # Statistieken van het eigen team (beide spelers, optioneel, geen invloed op Aura).
     lid_ids = ({game["a1"], game["a2"]} if eigen_team == game["team1_id"]
                else {game["b1"], game["b2"]})
     for veld, waarde in request.form.items():
@@ -1963,7 +2069,7 @@ def wedstrijd_melden(game_id):
         for melding in na_resultaat(db, game_id):
             flash(melding, "ok")
         flash("Beide teams meldden dezelfde uitslag — het resultaat is officieel en "
-              "de ELO-ratings zijn bijgewerkt!", "ok")
+              "de Aura-ratings zijn bijgewerkt!", "ok")
     else:
         flash("Oei: het andere team meldde een andere winnaar. Het resultaat blijft "
               "open tot de meldingen overeenkomen of een organisator beslist.", "fout")
@@ -2144,36 +2250,59 @@ def admin_seizoenen():
                    AS aantal_games
             FROM matchdays md WHERE md.season_id = ? ORDER BY md.date
         """, (s["id"],)).fetchall()
+        tellingen = db.execute("""
+            SELECT COUNT(*) AS totaal,
+                   SUM(CASE WHEN g.status = 'gepland' THEN 1 ELSE 0 END) AS open
+            FROM games g JOIN matchdays md ON md.id = g.matchday_id
+            WHERE md.season_id = ?
+        """, (s["id"],)).fetchone()
         seizoenen_lijst.append({"seizoen": s, "status": seizoen_status(s),
-                                "speeldagen": speeldagen})
+                                "speeldagen": speeldagen,
+                                "aantal_games": tellingen["totaal"] or 0,
+                                "openstaand": tellingen["open"] or 0})
     return render_template("admin_seizoenen.html", seizoenen_lijst=seizoenen_lijst)
 
 
-@app.route("/admin/wedstrijden")
+@app.route("/admin/seizoen/<int:seizoen_id>")
 @login_vereist
-def admin_wedstrijden():
+def admin_seizoen(seizoen_id):
+    """Eén seizoen beheren: speeldagen én de wedstrijden die erin gespeeld worden.
+
+    Vroeger stond het plannen van wedstrijden op een eigen tabblad, los van de
+    seizoenen. Maar een leaguewedstrijd hoort altijd bij een speeldag, en een
+    speeldag hoort altijd bij een seizoen — dus staat alles nu bij elkaar.
+    """
     db = get_db()
+    seizoen = db.execute("SELECT * FROM seasons WHERE id = ?", (seizoen_id,)).fetchone()
+    if not seizoen:
+        abort(404)
+
+    speeldagen = db.execute("""
+        SELECT md.*, (SELECT COUNT(*) FROM games g WHERE g.matchday_id = md.id)
+               AS aantal_games
+        FROM matchdays md WHERE md.season_id = ? ORDER BY md.date
+    """, (seizoen_id,)).fetchall()
+
     namen_sp = weergavenamen(db)
     teams = [{"id": t["id"], "naam": t["name"],
               "leden": f'{namen_sp.get(t["player1_id"], "?")} & '
                        f'{namen_sp.get(t["player2_id"], "?")}'}
              for t in db.execute("SELECT * FROM teams WHERE status = 'actief' "
                                  "ORDER BY name")]
-    gepland = db.execute(
-        "SELECT * FROM games WHERE status = 'gepland' AND tournament_id IS NULL "
-        "ORDER BY scheduled_at").fetchall()
-    recent = db.execute(
-        "SELECT * FROM games WHERE status = 'gespeeld' AND tournament_id IS NULL "
-        "ORDER BY played_at DESC, id DESC LIMIT 20").fetchall()
-    speeldag_opties = db.execute("""
-        SELECT md.id, md.title, md.date, s.name AS seizoen
-        FROM matchdays md JOIN seasons s ON s.id = md.season_id
-        ORDER BY md.date DESC
-    """).fetchall()
+    gepland = db.execute("""
+        SELECT g.* FROM games g JOIN matchdays md ON md.id = g.matchday_id
+        WHERE md.season_id = ? AND g.status = 'gepland' ORDER BY g.scheduled_at
+    """, (seizoen_id,)).fetchall()
+    recent = db.execute("""
+        SELECT g.* FROM games g JOIN matchdays md ON md.id = g.matchday_id
+        WHERE md.season_id = ? AND g.status = 'gespeeld'
+        ORDER BY g.played_at DESC, g.id DESC LIMIT 20
+    """, (seizoen_id,)).fetchall()
     actieve_types = db.execute("SELECT * FROM stat_types WHERE active = 1 "
                                "ORDER BY name").fetchall()
-    return render_template("admin_wedstrijden.html", teams=teams, gepland=gepland,
-                           recent=recent, speeldag_opties=speeldag_opties,
+    return render_template("admin_seizoen.html", seizoen=seizoen,
+                           status=seizoen_status(seizoen), speeldagen=speeldagen,
+                           teams=teams, gepland=gepland, recent=recent,
                            actieve_types=actieve_types, namen=teamnamen(db),
                            team_spelers=_team_spelers(db),
                            meldingen_per_game=_meldingen_per_game(db),
@@ -2324,6 +2453,7 @@ def speeldag_nieuw():
     if not seizoen or not datum:
         flash("Kies een geldig seizoen en een datum.", "fout")
         return redirect(url_for("admin_seizoenen"))
+    terug = redirect(url_for("admin_seizoen", seizoen_id=seizoen_id) + "#speeldagen")
     titel = (request.form.get("titel") or "").strip()
     if not titel:
         n = db.execute("SELECT COUNT(*) AS n FROM matchdays WHERE season_id = ?",
@@ -2333,13 +2463,15 @@ def speeldag_nieuw():
                (seizoen_id, titel, datum))
     db.commit()
     flash(f"“{titel}” toegevoegd aan {seizoen['name']}.", "ok")
-    return redirect(url_for("admin_seizoenen"))
+    return terug
 
 
 @app.route("/admin/speeldagen/<int:speeldag_id>/verwijderen", methods=["POST"])
 @login_vereist
 def speeldag_verwijderen(speeldag_id):
     db = get_db()
+    rij = db.execute("SELECT season_id FROM matchdays WHERE id = ?",
+                     (speeldag_id,)).fetchone()
     heeft_games = db.execute("SELECT 1 FROM games WHERE matchday_id = ? LIMIT 1",
                              (speeldag_id,)).fetchone()
     if heeft_games:
@@ -2348,6 +2480,8 @@ def speeldag_verwijderen(speeldag_id):
         db.execute("DELETE FROM matchdays WHERE id = ?", (speeldag_id,))
         db.commit()
         flash("Speeldag verwijderd.", "ok")
+    if rij:
+        return redirect(url_for("admin_seizoen", seizoen_id=rij["season_id"]) + "#speeldagen")
     return redirect(url_for("admin_seizoenen"))
 
 
@@ -2535,7 +2669,7 @@ def team_definitief_verwijderen(team_id):
     """Wis een team volledig, inclusief al zijn wedstrijden.
 
     Alle ratings worden daarna opnieuw berekend alsof die wedstrijden nooit
-    gespeeld zijn: wie ooit ELO verloor tegen dit team, krijgt die terug.
+    gespeeld zijn: wie ooit Aura verloor tegen dit team, krijgt die terug.
     """
     db = get_db()
     team = db.execute("SELECT * FROM teams WHERE id = ?", (team_id,)).fetchone()
@@ -2569,7 +2703,7 @@ def team_definitief_verwijderen(team_id):
     db.commit()
     na_resultaat(db)
     flash(f"Team “{team['name']}” is definitief verwijderd, samen met "
-          f"{aantal} wedstrijd(en). Alle ELO-ratings zijn herberekend alsof die "
+          f"{aantal} wedstrijd(en). Alle Aura-ratings zijn herberekend alsof die "
           "wedstrijden nooit gespeeld zijn.", "ok")
     return redirect(url_for("admin_spelers") + "#teams")
 
@@ -2658,6 +2792,17 @@ def team_avatar_wissen(team_id):
     return redirect(url_for("admin_spelers") + "#teams")
 
 
+def _terug_naar_seizoen(db, speeldag_id=None, game=None, anker=""):
+    """Het beheerscherm van het seizoen waar deze wedstrijd bij hoort."""
+    if game is not None and speeldag_id is None:
+        speeldag_id = game["matchday_id"]
+    rij = db.execute("SELECT season_id FROM matchdays WHERE id = ?",
+                     (speeldag_id,)).fetchone() if speeldag_id else None
+    if rij:
+        return redirect(url_for("admin_seizoen", seizoen_id=rij["season_id"]) + anker)
+    return redirect(url_for("admin_seizoenen"))
+
+
 @app.route("/admin/wedstrijden/nieuw", methods=["POST"])
 @login_vereist
 def wedstrijd_nieuw():
@@ -2668,10 +2813,10 @@ def wedstrijd_nieuw():
         speeldag_id = int(request.form.get("speeldag", ""))
     except ValueError:
         flash("Kies twee teams en een speeldag.", "fout")
-        return redirect(url_for("admin_wedstrijden"))
+        return redirect(url_for("admin_seizoenen"))
     if team1_id == team2_id:
         flash("Kies twee verschillende teams.", "fout")
-        return redirect(url_for("admin_wedstrijden"))
+        return _terug_naar_seizoen(db, speeldag_id)
 
     team1 = db.execute("SELECT * FROM teams WHERE id = ? AND status = 'actief'",
                        (team1_id,)).fetchone()
@@ -2681,20 +2826,20 @@ def wedstrijd_nieuw():
                           (speeldag_id,)).fetchone()
     if not team1 or not team2 or not speeldag:
         flash("Kies twee actieve teams en een bestaande speeldag.", "fout")
-        return redirect(url_for("admin_wedstrijden"))
+        return _terug_naar_seizoen(db, speeldag_id)
 
     spelers = {team1["player1_id"], team1["player2_id"],
                team2["player1_id"], team2["player2_id"]}
     if len(spelers) != 4:
         flash("Deze teams delen een speler en kunnen niet tegen elkaar spelen.", "fout")
-        return redirect(url_for("admin_wedstrijden"))
+        return _terug_naar_seizoen(db, speeldag_id)
 
     moment = request.form.get("moment") or f'{speeldag["date"]}T20:00'
     db.execute("INSERT INTO games (team1_id, team2_id, matchday_id, scheduled_at) "
                "VALUES (?, ?, ?, ?)", (team1_id, team2_id, speeldag_id, moment))
     db.commit()
     flash("Wedstrijd ingepland.", "ok")
-    return redirect(url_for("admin_wedstrijden") + "#openstaand")
+    return _terug_naar_seizoen(db, speeldag_id, anker="#openstaand")
 
 
 @app.route("/admin/wedstrijden/<int:game_id>/resultaat", methods=["POST"])
@@ -2704,12 +2849,12 @@ def wedstrijd_resultaat(game_id):
     game = db.execute("SELECT * FROM games WHERE id = ?", (game_id,)).fetchone()
     if not game or game["status"] != "gepland":
         flash("Deze wedstrijd bestaat niet of heeft al een resultaat.", "fout")
-        return redirect(url_for("admin_wedstrijden"))
+        return redirect(url_for("admin_seizoenen"))
 
     winnaar = request.form.get("winnaar")
     if winnaar not in ("1", "2"):
         flash("Duid de winnaar aan.", "fout")
-        return redirect(url_for("admin_wedstrijden") + "#openstaand")
+        return _terug_naar_seizoen(db, game=game, anker="#openstaand")
     winnaar_team = game["team1_id"] if winnaar == "1" else game["team2_id"]
     gespeeld_op = request.form.get("gespeeld_op") or datetime.now().strftime("%Y-%m-%dT%H:%M")
 
@@ -2730,11 +2875,11 @@ def wedstrijd_resultaat(game_id):
     db.commit()
     for melding in na_resultaat(db, game_id):
         flash(melding, "ok")
-    flash("Resultaat opgeslagen — de ELO-ratings en klassementen zijn bijgewerkt.", "ok")
+    flash("Resultaat opgeslagen — de Aura-ratings en klassementen zijn bijgewerkt.", "ok")
     if game["tournament_id"]:
         return redirect(url_for("toernooi_beheer", toernooi_id=game["tournament_id"])
                         + "#openstaand")
-    return redirect(url_for("admin_wedstrijden") + "#openstaand")
+    return _terug_naar_seizoen(db, game=game, anker="#openstaand")
 
 
 @app.route("/admin/wedstrijden/<int:game_id>/verwijderen", methods=["POST"])
@@ -2744,8 +2889,9 @@ def wedstrijd_verwijderen(game_id):
     game = db.execute("SELECT * FROM games WHERE id = ?", (game_id,)).fetchone()
     if not game:
         flash("Wedstrijd niet gevonden.", "fout")
-        return redirect(url_for("admin_wedstrijden"))
+        return redirect(url_for("admin_seizoenen"))
     was_gespeeld = game["status"] == "gespeeld"
+    speeldag_id = game["matchday_id"]
     toernooi_id = game["tournament_id"]
 
     if toernooi_id:
@@ -2784,7 +2930,7 @@ def wedstrijd_verwijderen(game_id):
         flash("Wedstrijd verwijderd en alle ratings herberekend.", "ok")
     else:
         flash("Geplande wedstrijd verwijderd.", "ok")
-    return redirect(url_for("admin_wedstrijden"))
+    return _terug_naar_seizoen(db, speeldag_id)
 
 
 @app.route("/admin/stats/nieuw", methods=["POST"])
@@ -2825,7 +2971,7 @@ def rang_nieuw():
         min_elo = float(request.form.get("min_elo", ""))
         max_elo = float(request.form.get("max_elo", ""))
     except ValueError:
-        flash("Vul geldige ELO-grenzen in.", "fout")
+        flash("Vul geldige Aura-grenzen in.", "fout")
         return redirect(url_for("admin_klassement") + "#rangen")
     if not naam or min_elo >= max_elo:
         flash("Geef een naam op en zorg dat de ondergrens lager is dan de bovengrens.", "fout")
@@ -2835,7 +2981,7 @@ def rang_nieuw():
         db.execute("INSERT INTO ranks (name, min_elo, max_elo, color) VALUES (?, ?, ?, ?)",
                    (naam, min_elo, max_elo, kleur))
         db.commit()
-        flash(f"Rang “{naam}” toegevoegd ({min_elo:.0f}–{max_elo:.0f} ELO).", "ok")
+        flash(f"Rang “{naam}” toegevoegd ({min_elo:.0f}–{max_elo:.0f} Aura).", "ok")
     except Exception:
         flash(f"Er bestaat al een rang met de naam “{naam}”.", "fout")
     return redirect(url_for("admin_klassement") + "#rangen")
@@ -3087,7 +3233,7 @@ def database_legen():
         return redirect(url_for("registreren"))
 
     flash("Alle wedstrijden, toernooien en seizoenen zijn gewist; spelers en teams "
-          f"blijven en staan weer op {START_ELO:.0f} ELO. Een back-up van de oude "
+          f"blijven en staan weer op {START_ELO:.0f} Aura. Een back-up van de oude "
           f"stand staat in backups/{os.path.basename(kopie)}.", "ok")
     return redirect(url_for("admin_instellingen") + "#leegmaken")
 
@@ -3306,7 +3452,7 @@ def toernooi_detail(toernooi_id):
                                       if t["status"] != "opzet" else []),
                            winnaar=winnaar, open_shootouts=open_shootouts,
                            label=TOERNOOI_STATUS.get(t["status"], ("", ""))[0],
-                           potten_getoond=toernooi_motor.potten_getoond(db, toernooi_id),
+                           potten_aantal=toernooi_motor.potten_aantal(db, toernooi_id),
                            heeft_loting=t["status"] != "opzet")
 
 
@@ -3320,7 +3466,7 @@ def toernooi_loting(toernooi_id):
     potten, rondes = toernooi_motor.loting_data(db, toernooi_id)
     return render_template("toernooi_loting.html", t=t, huidig_toernooi=t,
                            potten=potten, rondes=rondes,
-                           potten_getoond=toernooi_motor.potten_getoond(db, toernooi_id))
+                           potten_aantal=toernooi_motor.potten_aantal(db, toernooi_id))
 
 
 # ---------------------------------------------------------- toernooi-admin --
@@ -3343,7 +3489,7 @@ def toernooi_nieuw():
               request.form.get("start_tijd") or "19:00",
               int(request.form.get("ronden") or 4),
               int(request.form.get("ko_teams") or 8),
-              int(request.form.get("potten") or 4),
+              toernooi_motor.STANDAARD_POTTEN,
               int(request.form.get("slot") or 20)))
         db.commit()
         nieuw = db.execute("SELECT id FROM tournaments WHERE name = ?", (naam,)).fetchone()
@@ -3413,7 +3559,11 @@ def toernooi_beheer(toernooi_id):
                            namen=teamnamen(db),
                            meldingen_per_game=meldingen_per_game,
                            inzet=toernooi_motor.shootout_inzet(db, toernooi_id),
-                           potten_getoond=toernooi_motor.potten_getoond(db, toernooi_id),
+                           potten_aantal=toernooi_motor.potten_aantal(db, toernooi_id),
+                           terugtrek_opties={
+                               team["id"]: toernooi_motor.terugtrek_opties(
+                                   db, toernooi_id, team["id"])
+                               for team in teams} if t["status"] == "bracket" else {},
                            controle=toernooi_motor.controleer(db, toernooi_id),
                            nu=datetime.now().strftime("%Y-%m-%dT%H:%M"))
 
@@ -3431,7 +3581,6 @@ def toernooi_instellingen(toernooi_id):
             "start_tijd": request.form.get("start_tijd") or t["start_tijd"],
             "bracket_ronden": int(request.form.get("ronden") or t["bracket_ronden"]),
             "ko_teams": int(request.form.get("ko_teams") or t["ko_teams"]),
-            "potten": int(request.form.get("potten") or t["potten"]),
             "slot_minuten": int(request.form.get("slot") or t["slot_minuten"]),
         }
     except ValueError:
@@ -3515,6 +3664,25 @@ def toernooi_team_weg(toernooi_id, team_id):
                    (toernooi_id, team_id))
         db.commit()
         flash("Team uit het toernooi gehaald.", "ok")
+    return redirect(url_for("toernooi_beheer", toernooi_id=toernooi_id))
+
+
+@app.route("/admin/toernooi/<int:toernooi_id>/teams/<int:team_id>/terugtrekken",
+           methods=["POST"])
+@login_vereist
+def toernooi_team_terugtrekken(toernooi_id, team_id):
+    """Een team komt niet opdagen: schrappen en de rest opnieuw loten."""
+    db = get_db()
+    _toernooi_of_404(db, toernooi_id)
+    gekozen = request.form.get("doel")
+    ok, boodschap = toernooi_motor.terugtrekken(
+        db, toernooi_id, team_id,
+        doel=int(gekozen) if gekozen and gekozen.isdigit() else None)
+    if ok:
+        herbereken_alles(db)
+        for m in toernooi_motor.evalueer(db, toernooi_id):
+            flash(m, "ok")
+    flash(boodschap, "ok" if ok else "fout")
     return redirect(url_for("toernooi_beheer", toernooi_id=toernooi_id))
 
 

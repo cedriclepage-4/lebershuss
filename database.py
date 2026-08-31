@@ -3,11 +3,11 @@
 
 Nieuw in v5
 -----------
-* Spelers en teams hebben een **permanente ELO** (`players.elo`, `teams.elo`):
+* Spelers en teams hebben een **permanente Aura** (`players.elo`, `teams.elo`):
   die telt alles mee, zowel ligawedstrijden als toernooiwedstrijden.
-* Daarnaast heeft elk **seizoen zijn eigen ELO** (`season_ratings`): bij de start
+* Daarnaast heeft elk **seizoen zijn eigen Aura** (`season_ratings`): bij de start
   van een seizoen begint iedereen opnieuw op 1000. Enkel ligawedstrijden tellen
-  mee voor de seizoens-ELO.
+  mee voor de seizoens-Aura.
 * De site is opgesplitst in twee delen: **liga** (seizoenen, speeldagen) en
   **toernooi** (bracketfase + knockout), met dezelfde spelers en teams.
 * Er is geen algemeen adminwachtwoord meer: elke speler heeft een **rol**
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS players (
     nickname      TEXT NOT NULL DEFAULT '',      -- vrij aanpasbaar
     password_hash TEXT,
     role          TEXT NOT NULL DEFAULT 'speler',
-    elo           REAL NOT NULL DEFAULT 1000,   -- permanente ELO (liga + toernooi)
+    elo           REAL NOT NULL DEFAULT 1000,   -- permanente Aura (liga + toernooi)
     active        INTEGER NOT NULL DEFAULT 1,
     avatar        TEXT,
     created_at    TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS teams (
     status      TEXT NOT NULL DEFAULT 'in_afwachting'
                 CHECK (status IN ('in_afwachting', 'actief')),
     avatar      TEXT,
-    elo         REAL NOT NULL DEFAULT 1000,     -- permanente ELO (liga + toernooi)
+    elo         REAL NOT NULL DEFAULT 1000,     -- permanente Aura (liga + toernooi)
     created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS matchdays (
     date      TEXT NOT NULL
 );
 
--- ELO binnen één seizoen: iedereen start er op 1000.
+-- Aura binnen één seizoen: iedereen start er op 1000.
 CREATE TABLE IF NOT EXISTS season_ratings (
     season_id   INTEGER NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
     entity_type TEXT NOT NULL CHECK (entity_type IN ('speler', 'team')),
@@ -118,6 +118,9 @@ CREATE TABLE IF NOT EXISTS tournament_teams (
     pot           INTEGER,
     seed          INTEGER,
     start_elo     REAL,
+    -- Kwam dit team niet opdagen? Dan tellen zijn wedstrijden niet mee en
+    -- worden de resterende affiches opnieuw geloot (zie tournament.terugtrekken).
+    teruggetrokken INTEGER NOT NULL DEFAULT 0,
     UNIQUE (tournament_id, team_id)
 );
 
@@ -155,7 +158,7 @@ CREATE TABLE IF NOT EXISTS stat_types (
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
--- Waarden van die statistieken, per wedstrijd en per speler (geen invloed op ELO).
+-- Waarden van die statistieken, per wedstrijd en per speler (geen invloed op Aura).
 CREATE TABLE IF NOT EXISTS game_stats (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     game_id      INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
@@ -176,7 +179,7 @@ CREATE TABLE IF NOT EXISTS game_reports (
     UNIQUE (game_id, team_id)
 );
 
--- Historiek van elke ELO-wijziging. scope = 'permanent' (alles) of 'seizoen'.
+-- Historiek van elke Aura-wijziging. scope = 'permanent' (alles) of 'seizoen'.
 CREATE TABLE IF NOT EXISTS rating_history (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     game_id     INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
@@ -189,7 +192,7 @@ CREATE TABLE IF NOT EXISTS rating_history (
     season_id   INTEGER
 );
 
--- Zelf te definiëren rangen, bv. "Zilver" van 900 tot 1000 ELO.
+-- Zelf te definiëren rangen, bv. "Zilver" van 900 tot 1000 Aura.
 CREATE TABLE IF NOT EXISTS ranks (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     name    TEXT NOT NULL UNIQUE,
@@ -300,6 +303,15 @@ def _backup(pad: str) -> str:
                          f"shuss_backup_{datetime.now():%Y%m%d_%H%M%S}.db")
     shutil.copy2(pad, kopie)
     return kopie
+
+
+def _migreer_terugtrekken(conn):
+    """Voeg de kolom toe die bijhoudt of een team zich teruggetrokken heeft."""
+    kolommen = _kolommen(conn, "tournament_teams")
+    if kolommen and "teruggetrokken" not in kolommen:
+        conn.execute("ALTER TABLE tournament_teams ADD COLUMN teruggetrokken "
+                     "INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
 
 
 def _migreer_rollen(conn):
@@ -416,7 +428,7 @@ def init_db(pad: str = DB_PATH) -> None:
 
     Een database van vóór v4 wordt opzijgezet als back-up en vervangen door een
     verse database. Een v4-database wordt ter plaatse bijgewerkt naar v5:
-    de bestaande ELO wordt de permanente ELO en alle wedstrijden krijgen de
+    de bestaande Aura wordt de permanente Aura en alle wedstrijden krijgen de
     fase 'liga'.
     """
     if os.path.exists(pad) and _is_oud_schema(pad):
@@ -430,6 +442,7 @@ def init_db(pad: str = DB_PATH) -> None:
     _migreer(conn, pad)
     _migreer_rollen(conn)
     conn.executescript(SCHEMA)
+    _migreer_terugtrekken(conn)
     _hernummer_spelers(conn, pad)
     for sleutel, waarde in STANDAARD_INSTELLINGEN.items():
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",

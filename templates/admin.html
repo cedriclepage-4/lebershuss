@@ -5,7 +5,7 @@
 <section class="held">
   <h1>Organisatiepaneel</h1>
   <p>Alles voor de organisatie, per onderwerp gebundeld. Na elk resultaat worden
-     de ELO-ratings automatisch bijgewerkt.</p>
+     de Aura-ratings automatisch bijgewerkt.</p>
 </section>
 
 {% include "_admin_nav.html" %}
@@ -26,7 +26,8 @@
   <ul class="ere-lijst">
     {% if cijfers.conflicten %}
     <li>⚠️ <strong>{{ cijfers.conflicten }}</strong> wedstrijd(en) met tegenstrijdige
-        meldingen — <a class="profiel-link" href="{{ url_for('admin_wedstrijden') }}#openstaand">beslis zelf wie won</a>.</li>
+        meldingen — <a class="profiel-link" href="{{ url_for('admin_seizoenen') }}">beslis zelf wie won</a>
+        bij het juiste seizoen of toernooi.</li>
     {% endif %}
     {% if cijfers.uitnodigingen %}
     <li>✉️ <strong>{{ cijfers.uitnodigingen }}</strong> teamuitnodiging(en) wachten nog
@@ -40,18 +41,10 @@
   <a class="kaart tegel {{ 'tegel-uit' if not league_zichtbaar }}" href="{{ url_for('admin_seizoenen') }}">
     <span class="tegel-icoon">🗓️</span>
     <h3>Seizoenen {% if not league_zichtbaar %}<span class="pil pil-verborgen">verborgen</span>{% endif %}</h3>
-    <p class="stil klein-tekst">Seizoenen en speeldagen beheren. Elk seizoen heeft
-       zijn eigen ELO-klassement.</p>
-    <p class="tegel-cijfer">{{ cijfers.seizoenen }} seizoen(en)</p>
+    <p class="stil klein-tekst">Seizoenen, speeldagen én de leaguewedstrijden die
+       erin gespeeld worden. Elk seizoen heeft zijn eigen Aura-klassement.</p>
+    <p class="tegel-cijfer">{{ cijfers.seizoenen }} seizoen(en) · {{ cijfers.open_liga }} openstaand</p>
     {% if huidig_seizoen %}<span class="pil pil-actief">nu bezig: {{ huidig_seizoen['name'] }}</span>{% endif %}
-  </a>
-
-  <a class="kaart tegel {{ 'tegel-uit' if not league_zichtbaar }}" href="{{ url_for('admin_wedstrijden') }}">
-    <span class="tegel-icoon">🥅</span>
-    <h3>Wedstrijden {% if not league_zichtbaar %}<span class="pil pil-verborgen">verborgen</span>{% endif %}</h3>
-    <p class="stil klein-tekst">Leaguewedstrijden plannen, resultaten invullen en
-       fouten rechtzetten.</p>
-    <p class="tegel-cijfer">{{ cijfers.open_liga }} openstaand · {{ cijfers.gespeeld }} gespeeld</p>
     {% if cijfers.conflicten %}<span class="pil pil-rood">{{ cijfers.conflicten }} conflict(en)</span>{% endif %}
   </a>
 
@@ -75,7 +68,7 @@
   <a class="kaart tegel" href="{{ url_for('admin_klassement') }}">
     <span class="tegel-icoon">📊</span>
     <h3>Rangen &amp; statistieken</h3>
-    <p class="stil klein-tekst">Eigen rangen op ELO en zelfgemaakte statistieken
+    <p class="stil klein-tekst">Eigen rangen op Aura en zelfgemaakte statistieken
        zoals “saves”.</p>
   </a>
 

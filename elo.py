@@ -2,6 +2,11 @@
 """
 ELO-motor voor Leberschuss Tonzent.
 
+Op de site heet deze rating **Aura**. In de code houden we de technische naam
+ELO aan — het is letterlijk het systeem van Arpad Elo — net als de kolomnamen
+`players.elo` en `teams.elo`. Wie de tekst op het scherm wil aanpassen, zoekt
+dus naar "Aura" in de templates, niet hier.
+
 Een wedstrijd is altijd 2 tegen 2. Elke speler heeft een eigen ELO-rating,
 en elk team (elk duo dat ooit samen gespeeld heeft) heeft ook een ELO-rating.
 

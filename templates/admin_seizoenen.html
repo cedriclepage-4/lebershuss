@@ -3,9 +3,10 @@
 {% block inhoud %}
 
 <section class="held">
-  <h1>Seizoenen &amp; speeldagen</h1>
-  <p>Elk seizoen heeft zijn eigen ELO-klassement: bij de start begint iedereen
-     opnieuw op 1000. De permanente ELO loopt gewoon door.</p>
+  <h1>Seizoenen</h1>
+  <p>Elk seizoen heeft zijn eigen Aura-klassement: bij de start begint iedereen
+     opnieuw op 1000. De permanente Aura loopt gewoon door. Klik een seizoen open
+     om er speeldagen en wedstrijden in te zetten.</p>
 </section>
 
 {% include "_admin_nav.html" %}
@@ -32,42 +33,21 @@
 {% for item in seizoenen_lijst %}
 <div class="kaart">
   <div class="seizoen-kop">
-    <h3><a class="profiel-link" href="{{ url_for('seizoen_detail', seizoen_id=item.seizoen['id']) }}">{{ item.seizoen['name'] }}</a>
+    <h3><a class="profiel-link" href="{{ url_for('admin_seizoen', seizoen_id=item.seizoen['id']) }}">{{ item.seizoen['name'] }}</a>
         <span class="pil {{ 'pil-actief' if item.status == 'bezig' }}">{{ item.status }}</span></h3>
     <form method="post" action="{{ url_for('seizoen_verwijderen', seizoen_id=item.seizoen['id']) }}"
           data-confirm="Seizoen “{{ item.seizoen['name'] }}” en zijn speeldagen verwijderen? Gespeelde wedstrijden blijven bestaan.">
       <button type="submit" class="knop gevaar klein">Verwijderen</button>
     </form>
   </div>
-  <div class="wedstrijd-meta">📅 {{ item.seizoen['start_date']|dag }} t.e.m. {{ item.seizoen['end_date']|dag }}</div>
-  {% if item.speeldagen %}
-  <table class="tabel compact">
-    <thead><tr><th>Speeldag</th><th>Datum</th><th class="kol-num">Wedstrijden</th><th></th></tr></thead>
-    <tbody>
-      {% for sd in item.speeldagen %}
-      <tr>
-        <td class="naam">{{ sd['title'] }}</td>
-        <td>{{ sd['date']|dag }}</td>
-        <td class="kol-num">{{ sd['aantal_games'] }}</td>
-        <td class="kol-num">
-          {% if sd['aantal_games'] == 0 %}
-          <form method="post" action="{{ url_for('speeldag_verwijderen', speeldag_id=sd['id']) }}"
-                data-confirm="Speeldag “{{ sd['title'] }}” verwijderen?">
-            <button type="submit" class="knop gevaar klein">Verwijderen</button>
-          </form>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-  <form method="post" action="{{ url_for('speeldag_nieuw') }}" class="rij-form ruimte-boven">
-    <input type="hidden" name="seizoen" value="{{ item.seizoen['id'] }}">
-    <input type="text" name="titel" placeholder="Titel (leeg = Speeldag {{ item.speeldagen|length + 1 }})">
-    <input type="date" name="datum" min="{{ item.seizoen['start_date'] }}" max="{{ item.seizoen['end_date'] }}" required>
-    <button type="submit" class="knop">Speeldag toevoegen</button>
-  </form>
+  <div class="wedstrijd-meta">📅 {{ item.seizoen['start_date']|dag }} t.e.m. {{ item.seizoen['end_date']|dag }}
+    · {{ item.speeldagen|length }} speeldag{{ 'en' if item.speeldagen|length != 1 }}
+    · {{ item.aantal_games }} wedstrijd{{ 'en' if item.aantal_games != 1 }}
+    {%- if item.openstaand %} · <strong>{{ item.openstaand }} nog te spelen</strong>{% endif %}</div>
+  <p class="ruimte-boven">
+    <a class="knop primair" href="{{ url_for('admin_seizoen', seizoen_id=item.seizoen['id']) }}">Beheren</a>
+    <a class="knop" href="{{ url_for('seizoen_detail', seizoen_id=item.seizoen['id']) }}">Publieke pagina</a>
+  </p>
 </div>
 {% else %}
 <div class="kaart leeg">Nog geen seizoenen. Maak er hierboven eentje aan.</div>

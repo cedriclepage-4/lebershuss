@@ -4,7 +4,7 @@
 
 <section class="held">
   <h1>Rangen &amp; statistieken</h1>
-  <p>Zelf te bepalen rangen op basis van ELO, en eigen statistieken die spelers bij
+  <p>Zelf te bepalen rangen op basis van Aura, en eigen statistieken die spelers bij
      elke uitslag kunnen invullen.</p>
 </section>
 
@@ -12,7 +12,7 @@
 
 <h2 class="sectiekop" id="rangen">Rangen</h2>
 <div class="kaart">
-  <p class="stil">Definieer zelf rangen op basis van de permanente ELO, bv. <em>Zilver</em>
+  <p class="stil">Definieer zelf rangen op basis van de permanente Aura, bv. <em>Zilver</em>
      van 900 tot 1000. Spelers krijgen hun rang automatisch te zien in het klassement
      en op hun profiel.</p>
   <form method="post" action="{{ url_for('rang_nieuw') }}" class="rij-form">
@@ -49,7 +49,7 @@
 <div class="kaart">
   <p class="stil">Maak hier een nieuwe statistiek aan (bv. <em>saves</em>). Ze verschijnt
      meteen op elk resultaatformulier en krijgt automatisch een eigen klassement op de
-     statistiekenpagina. Statistieken hebben geen invloed op de ELO-ratings.</p>
+     statistiekenpagina. Statistieken hebben geen invloed op de Aura-ratings.</p>
   <form method="post" action="{{ url_for('stat_nieuw') }}" class="rij-form">
     <input type="text" name="naam" placeholder="Naam (bv. saves)" required>
     <input type="text" name="eenheid" placeholder="Eenheid (optioneel, bv. stuks)">

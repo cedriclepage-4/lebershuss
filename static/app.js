@@ -29,6 +29,21 @@
     }
   });
 
+  /* Terugknop: kwam je van een andere pagina op deze site, dan gaan we echt
+     één stap terug — zo beland je precies waar je vandaan kwam. Kwam je hier
+     rechtstreeks binnen (nieuw tabblad, QR-code, gedeelde link), dan laten we
+     de gewone link staan die naar de overzichtspagina wijst. */
+  document.querySelectorAll("a[data-terug]").forEach(function (knop) {
+    var vanBinnen = document.referrer &&
+                    document.referrer.indexOf(window.location.origin) === 0 &&
+                    document.referrer !== window.location.href;
+    if (!vanBinnen || window.history.length <= 1) return;
+    knop.addEventListener("click", function (e) {
+      e.preventDefault();
+      window.history.back();
+    });
+  });
+
   /* Beamermodus: ververst zichzelf, zodat de stand de hele avond meeloopt.
      Wordt aangezet met ?beamer=1 in het adres — nooit zomaar voor spelers,
      die kunnen net een formulier aan het invullen zijn. */
@@ -197,7 +212,7 @@
   });
 })();
 
-/* ELO-grafiek op spelersprofielen (vanilla SVG, geen externe libraries) */
+/* Aura-grafiek op spelersprofielen (vanilla SVG, geen externe libraries) */
 (function () {
   "use strict";
   var houder = document.getElementById("elo-grafiek");
@@ -270,7 +285,7 @@
   function toonPunt(i, clientX) {
     cirkels.forEach(function (c, j) { c.classList.toggle("actief", i === j); });
     var p = data[i];
-    tip.innerHTML = p.datum + "<br><strong>" + p.elo + " ELO</strong> · #" + p.rang + " in het klassement";
+    tip.innerHTML = p.datum + "<br><strong>" + p.elo + " Aura</strong> · #" + p.rang + " in het klassement";
     var rect = houder.getBoundingClientRect();
     var schaal = rect.width / B;
     tip.style.left = (x(i) * schaal) + "px";

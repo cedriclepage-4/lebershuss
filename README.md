@@ -57,13 +57,13 @@ hetzelfde profiel en hetzelfde team.
 | | League | Toernooi |
 | --- | --- | --- |
 | Structuur | seizoenen met speeldagen | bracketfase + knockout op één dag |
-| Seizoens-ELO | ✅ telt mee | — |
-| Permanente ELO | ✅ telt mee | ✅ telt mee (zwaarder naarmate je verder geraakt) |
+| Seizoens-Aura | ✅ telt mee | — |
+| Permanente Aura | ✅ telt mee | ✅ telt mee (zwaarder naarmate je verder geraakt) |
 
-**Permanente ELO** is je rating van altijd: elke wedstrijd die je ooit speelde telt
+**Permanente Aura** is je rating van altijd: elke wedstrijd die je ooit speelde telt
 mee. Die staat op het klassement en op je profiel.
 
-**Seizoens-ELO** begint elk seizoen opnieuw op 1000 voor iedereen. Enkel
+**Seizoens-Aura** begint elk seizoen opnieuw op 1000 voor iedereen. Enkel
 leaguewedstrijden van dat seizoen tellen mee. Elk seizoen heeft zo zijn eigen
 klassement, terwijl je permanente rating gewoon doorloopt.
 
@@ -71,7 +71,7 @@ klassement, terwijl je permanente rating gewoon doorloopt.
 
 Naar het model van de nieuwe Champions League:
 
-1. **Potten.** Alle deelnemende teams worden op permanente ELO verdeeld over
+1. **Potten.** Alle deelnemende teams worden op permanente Aura verdeeld over
    (standaard) 4 potten. Pot 1 zijn de sterkste teams.
 2. **Bracketfase.** Iedereen zit in één grote bracket. De organisator kiest hoeveel
    wedstrijden elk team speelt; de tegenstanders worden geloot uit de verschillende
@@ -88,7 +88,7 @@ Naar het model van de nieuwe Champions League:
    duel speelde vergelijken met een team dat er drie speelde. Is ze onvolledig, dan
    plant het toernooi automatisch beslissingswedstrijden in tussen álle teams die gelijk
    staan (winnen of verliezen, gelijk bestaat niet). Een shootout telt **niet** mee
-   voor de ELO — hij beslist enkel wie doorstoot. De winnaars vormen de bovenste
+   voor de Aura — hij beslist enkel wie doorstoot. De winnaars vormen de bovenste
    helft; blijft het spannend, dan volgt er vanzelf een kleinere extra ronde.
 4. **Knockout.** De beste 2, 4, 8, 16, ... teams gaan door. Nummer 1 tegen de laagst
    geplaatste, zodat de nummers 1 en 2 elkaar pas in de finale kunnen treffen.
@@ -108,7 +108,7 @@ Voorbeeld: 7 teams, 4 wedstrijden per team en 2 tafels = 14 wedstrijden in
 potten links, en daarnaast de affiches die je één voor één omdraait (spatiebalk of
 knop). Ideaal om vlak voor de aftrap te tonen.
 
-**ELO-gewicht per fase** (op de permanente ELO):
+**Aura-gewicht per fase** (op de permanente Aura):
 
 | Fase | Gewicht |
 | --- | --- |
@@ -127,22 +127,44 @@ via hun profiel, of een organisator vult ze in.
 
 **Publiek** (geen login nodig)
 
-- *Klassement*: ELO-ranglijst van alle spelers én van alle teams. Elk duo dat
-  ooit samen gespeeld heeft, verschijnt automatisch als team.
-- *Wedstrijden*: geplande affiches en gespeelde resultaten, per maand
-  gegroepeerd, met de gewonnen/verloren ELO-punten per team.
+De site heeft drie delen, elk met een eigen tabblad bovenaan.
+
+**🏠 Home** — wat over de hele club gaat, los van league of toernooi.
+
+- *Globaal klassement* (de startpagina): Aura-ranglijst van alle spelers én van
+  alle teams, over álle wedstrijden die ooit gespeeld zijn. Elk duo dat ooit
+  samen gespeeld heeft, verschijnt automatisch als team. Is er een toernooi
+  bezig, dan staat dat bovenaan uitgelicht.
 - *Statistieken*: bovenaan het vaste **Recordboek** (langste en actuele
   winstreeks, meeste wedstrijden en overwinningen, beste winstpercentage,
-  hoogste ELO ooit, grootste ELO-sprong en het onafscheidelijkste duo), daaronder
+  hoogste Aura ooit, grootste Aura-sprong en het onafscheidelijkste duo), daaronder
   klassementen (totaal en gemiddelde per wedstrijd) voor elke statistiek die de
   organisatoren aanmaken. Zolang er geen statistieken bestaan,
   toont deze pagina een nette placeholder.
 
+**🏆 League** — de competitie in seizoenen.
+
+- *Alle seizoenen*: elk seizoen met zijn status, speeldagen en topklimmer.
+- Klik door op een seizoen voor het **seizoensklassement** (spelers en teams),
+  de eregalerij van dat seizoen, wat er nog gepland staat en alle gespeelde
+  wedstrijden per speeldag — met de gewonnen of verloren Aura per team en de
+  gemelde statistieken per wedstrijd.
+
+**🥇 Toernooi** — de toernooiavonden.
+
+- *Alle toernooien*, en per toernooi de stand, de kalender, het knockoutschema
+  en de uitleg bij gelijke standen.
+
 **Organisatie** (voor accounts met de rol organisator of eigenaar)
 
-Het organisatiepaneel is opgesplitst in aparte pagina's: *Overzicht* (wat vraagt je
-aandacht), *Seizoenen*, *Wedstrijden*, *Toernooien*, *Spelers & teams*,
-*Rangen & statistieken* en *Instellingen*.
+Het organisatiepaneel is opgesplitst in aparte pagina's, in deze volgorde:
+*Overzicht* (wat vraagt je aandacht), *Spelers & teams*, *Seizoenen*,
+*Toernooien*, *Rangen & statistieken* en *Instellingen*.
+
+Wedstrijden hebben geen eigen tabblad meer: een leaguewedstrijd hoort bij een
+speeldag en een speeldag hoort bij een seizoen. Je klikt dus een seizoen open en
+beheert daar de speeldagen, plant er wedstrijden in, vult resultaten in en zet
+fouten recht.
 
 - Rollen beheren bij *Spelers & teams → Organisatoren*:
   - **Elke organisator** kan iemand erbij nemen en zijn *eigen* rol teruggeven.
@@ -162,7 +184,7 @@ aandacht), *Seizoenen*, *Wedstrijden*, *Toernooien*, *Spelers & teams*,
   een back-up in `backups/`:
   - *Alleen de geschiedenis wissen* (`wis geschiedenis`) — wedstrijden,
     toernooien, seizoenen en ratings weg; spelers en teams blijven en starten
-    weer op 1000 ELO. Ideaal om een nieuw seizoen te beginnen.
+    weer op 1000 Aura. Ideaal om een nieuw seizoen te beginnen.
   - *Alles wissen* (`wis alles`) — ook alle spelers, teams en profielfoto's. Je
     wordt uitgelogd; het eerste account dat zich daarna registreert is opnieuw de
     eigenaar. Rangen en statistiektypes blijven bestaan.
@@ -174,7 +196,7 @@ aandacht), *Seizoenen*, *Wedstrijden*, *Toernooien*, *Spelers & teams*,
   doorstoten (2, 4, 8, 16, …), het aantal potten en de duur van een wedstrijd.
   Wijs daarna teams toe, voeg de tafels toe en klik op **Toernooi genereren**:
   potten, affiches, kalender en knockoutschema rollen er in één keer uit.
-- Spelers toevoegen (iedereen start op 1000 ELO). Elke speler krijgt bij het
+- Spelers toevoegen (iedereen start op 1000 Aura). Elke speler krijgt bij het
   registreren een **willekeurig spelersnummer van 4 cijfers** (bv. `#4821`) — aan
   het nummer kan je dus niet zien wie zich als eerste inschreef. Je vindt elkaar
   ermee terug bij het maken van een team, en je kan er ook mee inloggen.
@@ -215,22 +237,23 @@ van die accounts nemen. Zet het dus enkel open terwijl je erbij bent. Elke claim
 komt met tijdstip en IP-adres in het **logboek** bij *Accounts opeisen*. Nam
 iemand het verkeerde account, klik dan **Vrijgeven** bij die speler: het
 wachtwoord wordt gewist en het account staat weer klaar.
-- Wedstrijden plannen: kies vier spelers, teams worden automatisch aangemaakt
-  of hergebruikt.
+- Wedstrijden plannen: open het seizoen bij *Seizoenen*, maak daar een speeldag
+  aan en plan er de affiches op. Teams worden automatisch aangemaakt of
+  hergebruikt.
 - Resultaten invullen (reserve-optie): normaal melden spelers zelf de uitslag;
   organisatoren zien de binnengekomen meldingen bij elke openstaande wedstrijd
   en kunnen zelf de winnaar invullen, bv. om een conflict te beslechten.
-  Gelijkspel bestaat niet. Na elk resultaat worden alle ELO's bijgewerkt.
+  Gelijkspel bestaat niet. Na elk resultaat worden alle Aura's bijgewerkt.
 - Statistieken beheren: maak bv. "saves" aan en het veld verschijnt vanaf dan
   op elk resultaatformulier + krijgt een eigen bord op de statistiekenpagina.
-  Statistieken hebben nooit invloed op ELO.
+  Statistieken hebben nooit invloed op Aura.
 - Resultaten corrigeren: verwijder een fout resultaat; alle ratings worden dan
   automatisch chronologisch herberekend.
 - Spelers en teams **definitief verwijderen** (bij *Spelers & teams*, achter
   “Definitief verwijderen…”). Je moet het woord `verwijder` intypen, zodat het
   nooit per ongeluk gebeurt.
   - Een **team** verdwijnt samen met al zijn wedstrijden; daarna wordt alles
-    herberekend alsof die nooit gespeeld zijn — wie er ELO aan verloor, krijgt
+    herberekend alsof die nooit gespeeld zijn — wie er Aura aan verloor, krijgt
     die exact terug. Speelt het team nog mee in een lopend toernooi, dan wordt
     het geweigerd (anders klopt het schema niet meer).
   - Een **speler** kan pas weg als hij in geen enkel team meer zit; de app zegt
@@ -240,18 +263,18 @@ wachtwoord wordt gewist en het account staat weer klaar.
   (informatief — jullie bepalen zelf de maandlimiet).
 - K-factoren instelbaar via *Instellingen*.
 
-## Hoe werkt de ELO-berekening?
+## Hoe werkt de Aura-berekening?
 
 Elke wedstrijd is 2 tegen 2. Spelers én teams hebben elk een eigen rating.
 
-- **Zijde-rating** van een kant = 50% team-ELO + 50% gemiddelde van de twee
-  speler-ELO's.
-- **Team-update**: klassieke ELO-formule op basis van de zijde-ratings van
+- **Zijde-rating** van een kant = 50% team-Aura + 50% gemiddelde van de twee
+  speler-Aura's.
+- **Team-update**: klassieke Aura-formule op basis van de zijde-ratings van
   beide kanten (K-factor teams, standaard 32).
-- **Speler-update**: de effectieve rating van een speler = 50% eigen ELO +
-  25% ELO van de teammaat + 25% team-ELO. Die wordt afgezet tegen de
+- **Speler-update**: de effectieve rating van een speler = 50% eigen Aura +
+  25% Aura van de teammaat + 25% team-Aura. Die wordt afgezet tegen de
   zijde-rating van de tegenstanders (K-factor spelers, standaard 32).
-- Een nieuw team start op het gemiddelde van de ELO's van zijn twee spelers op
+- Een nieuw team start op het gemiddelde van de Aura's van zijn twee spelers op
   het moment van zijn eerste wedstrijd.
 
 Zo weegt alles mee: je eigen niveau, je maat, je team en de sterkte van de
@@ -263,12 +286,12 @@ toernooi voor 0,75, en in de knockout loopt het op: achtste ×1,25, kwart ×1,5,
 halve ×1,75, finale ×2. Een shootout telt helemaal niet mee.
 
 **In de knockout betaalt de verliezer maar de helft.** Zonder die regel kostte
-ver geraken je ELO: je kwartfinale verliezen kostte 24 punten terwijl je je
+ver geraken je Aura: je kwartfinale verliezen kostte 24 punten terwijl je je
 helemaal niet plaatsen niets kostte, en een late nederlaag woog zwaarder dan de
 overwinning die je er bracht. Nu levert elke ronde die je overleeft ook echt
 iets op:
 
-| verloop | ELO |
+| verloop | Aura |
 | --- | --- |
 | net niet gekwalificeerd | 0 |
 | uit in de kwartfinale | −12 |
@@ -276,8 +299,8 @@ iets op:
 | tot de finale, daar verloren | +32 |
 | toernooi gewonnen | +78 |
 
-De keerzijde: in de knockout is de ELO geen zuiver nulsomspel meer — er komt per
-toernooi wat ELO bij in omloop (± 90 punten, verspreid over alle deelnemers).
+De keerzijde: in de knockout is de Aura geen zuiver nulsomspel meer — er komt per
+toernooi wat Aura bij in omloop (± 90 punten, verspreid over alle deelnemers).
 In de league en de bracketfase blijft het wél een nulsom: wat de ene wint,
 verliest de andere.
 
@@ -286,7 +309,7 @@ verliest de andere.
 | Bestand | Rol |
 | --- | --- |
 | `app.py` | Flask-app: routes, leaderboards, adminpaneel |
-| `elo.py` | ELO-berekening + gewicht per fase |
+| `elo.py` | Aura-berekening + gewicht per fase |
 | `tournament.py` | Toernooimotor: potten, loting, kalender, stand, knockout |
 | `database.py` | SQLite-schema, initialisatie en migratie |
 | `test_toernooi.py` | Simulatie die een volledig toernooi uitspeelt en controleert |

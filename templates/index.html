@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block titel %}Klassement{% endblock %}
+{% block titel %}Globaal klassement{% endblock %}
 {% block inhoud %}
 
 <section class="held">
-  <h1>Het klassement</h1>
-  <p>Hieronder vind je de actuele ELO-ratings van alle 
-     spelers en van elk duo dat ooit samen aan tafel stond.
+  <h1>Globaal klassement</h1>
+  <p>De Aura-rating van iedereen die ooit aan tafel stond — league én toernooi
+     samen. Elk duo dat samen speelde heeft er ook een.
      Klik op een naam voor het volledige profiel.</p>
   <div class="held-cijfers">
     <div class="cijfer"><strong>{{ aantal_spelers }}</strong><span>spelers</span></div>
@@ -13,6 +13,19 @@
     <div class="cijfer"><strong>{{ aantal_gespeeld }}</strong><span>gespeelde wedstrijden</span></div>
   </div>
 </section>
+
+{% if lopend %}
+<a class="kaart lopend-kaart" href="{{ url_for('toernooi_detail', toernooi_id=lopend['id']) }}">
+  <span class="lopend-icoon">🥇</span>
+  <span class="lopend-tekst">
+    <span class="lopend-label">{{ 'Nu bezig' if lopend['status'] in ('bracket', 'knockout') else 'Volgend toernooi' }}</span>
+    <strong>{{ lopend['name'] }}</strong>
+    <small>{{ lopend['date']|dag }} · vanaf {{ lopend['start_tijd'] }}
+      {%- if lopend_label %} · {{ lopend_label[0] }}{% endif %}</small>
+  </span>
+  <span class="lopend-actie">Naar het toernooi ›</span>
+</a>
+{% endif %}
 
 <div class="tabs" data-tabs>
   <button class="tab actief" data-tab="spelers">Spelers</button>
@@ -25,7 +38,7 @@
     <div class="zoekbalk"><input type="search" placeholder="Zoek een speler…" data-zoek="#tabel-spelers"></div>
     <table class="tabel" id="tabel-spelers">
       <thead>
-        <tr><th class="kol-rang">#</th><th>Speler</th><th class="verbergen-mobiel">Rang</th><th class="kol-elo">ELO</th>
+        <tr><th class="kol-rang">#</th><th>Speler</th><th class="verbergen-mobiel">Rang</th><th class="kol-elo">Aura</th>
             <th class="kol-num verbergen-mobiel">Gespeeld</th><th class="kol-num">W</th><th class="kol-num">V</th>
             <th class="kol-pct verbergen-mobiel">Winst%</th></tr>
       </thead>
@@ -62,7 +75,7 @@
     <div class="zoekbalk"><input type="search" placeholder="Zoek een team…" data-zoek="#tabel-teams"></div>
     <table class="tabel" id="tabel-teams">
       <thead>
-        <tr><th class="kol-rang">#</th><th>Team</th><th class="kol-elo">ELO</th>
+        <tr><th class="kol-rang">#</th><th>Team</th><th class="kol-elo">Aura</th>
             <th class="kol-num verbergen-mobiel">Gespeeld</th><th class="kol-num">W</th><th class="kol-num">V</th>
             <th class="kol-pct verbergen-mobiel">Winst%</th></tr>
       </thead>

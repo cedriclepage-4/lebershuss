@@ -11,7 +11,7 @@
     <div class="cijfer"><strong>{{ teams|length }}</strong><span>teams</span></div>
     <div class="cijfer"><strong>{{ t['bracket_ronden'] }}</strong><span>wedstrijden per team</span></div>
     <div class="cijfer"><strong>{{ t['ko_teams'] }}</strong><span>naar de knockout</span></div>
-    {% if potten_getoond %}<div class="cijfer"><strong>{{ t['potten'] }}</strong><span>potten</span></div>{% endif %}
+    {% if potten_aantal > 1 %}<div class="cijfer"><strong>{{ potten_aantal }}</strong><span>potten</span></div>{% endif %}
   </div>
   {% if heeft_loting %}
   <p class="ruimte-boven">
@@ -116,11 +116,11 @@
       <strong>kwaliteit</strong> van je overwinningen (de punten van de teams die je
       versloeg) en vervolgens je hele <strong>programma</strong>. Valt het dan nog niet te
       scheiden én hangt er een ticket van af, dan spelen de teams rond de streep één
-      shootout: winnaar door, verliezer eruit. Een shootout telt niet mee voor de ELO.</p>
+      shootout: winnaar door, verliezer eruit. Een shootout telt niet mee voor de Aura.</p>
     <table class="tabel">
       <thead>
         <tr>
-          <th class="kol-rang">#</th><th>Team</th>{% if potten_getoond %}<th class="verbergen-mobiel">Pot</th>{% endif %}
+          <th class="kol-rang">#</th><th>Team</th>{% if potten_aantal > 1 %}<th class="verbergen-mobiel">Pot</th>{% endif %}
           <th class="kol-num">G</th><th class="kol-num">W</th><th class="kol-num">V</th>
           <th class="kol-num">Ptn</th><th class="verbergen-mobiel">Vorm</th>
         </tr>
@@ -137,7 +137,7 @@
             {% if r.onbeslist %}<span class="pil pil-rood">shootout nodig</span>
             {% elif r.gedeeld %}<span class="pil">gedeelde plaats</span>{% endif %}
           </td>
-          {% if potten_getoond %}<td class="verbergen-mobiel"><span class="pot-pil pot-{{ r.pot }}">Pot {{ r.pot }}</span></td>{% endif %}
+          {% if potten_aantal > 1 %}<td class="verbergen-mobiel"><span class="pot-pil pot-{{ r.pot }}">Pot {{ r.pot }}</span></td>{% endif %}
           <td class="kol-num">{{ r.gespeeld }}</td>
           <td class="kol-num">{{ r.winst }}</td>
           <td class="kol-num">{{ r.verlies }}</td>
@@ -199,7 +199,7 @@
             <th class="kol-num verbergen-mobiel" title="Som van de punten van de teams die dit team versloeg">Kwaliteit</th>
             <th class="kol-num verbergen-mobiel" title="Som van de punten van álle tegenstanders die dit team trof">Programma</th>
             {% if groep.kracht_beslist %}
-            <th class="kol-num" title="De ELO die dit team vanavond won of verloor">Kracht</th>
+            <th class="kol-num" title="De Aura die dit team vanavond won of verloor">Kracht</th>
             {% endif %}<th></th></tr>
       </thead>
       <tbody>
@@ -344,7 +344,7 @@
   <div class="kaart">
     <h3>Deelnemers</h3>
     <table class="tabel">
-      <thead><tr><th>Team</th><th class="wikkel">Spelers</th>{% if potten_getoond %}<th class="verbergen-mobiel">Pot</th>{% endif %}<th class="kol-elo">ELO</th></tr></thead>
+      <thead><tr><th>Team</th><th class="wikkel">Spelers</th>{% if potten_aantal > 1 %}<th class="verbergen-mobiel">Pot</th>{% endif %}<th class="kol-elo">Aura</th></tr></thead>
       <tbody>
         {% for team in teams %}
         <tr>
@@ -352,7 +352,7 @@
             {%- if team.avatar %}<img class="avatar-mini" src="{{ url_for('media', bestand=team.avatar) }}" alt="">
             {%- else %}<span class="avatar-mini avatar-fallback">{{ team.naam[0]|upper }}</span>{% endif %} {{ team.naam }}</a></span></td>
           <td class="stil wikkel">{{ team.spelers }}</td>
-          {% if potten_getoond %}<td class="verbergen-mobiel"><span class="pot-pil pot-{{ team.pot }}">Pot {{ team.pot }}</span></td>{% endif %}
+          {% if potten_aantal > 1 %}<td class="verbergen-mobiel"><span class="pot-pil pot-{{ team.pot }}">Pot {{ team.pot }}</span></td>{% endif %}
           <td class="kol-elo"><span class="elo-badge">{{ team.elo|elo }}</span></td>
         </tr>
         {% endfor %}

@@ -5,7 +5,7 @@
 <section class="held">
   <h1>{{ seizoen['name'] }} <span class="pil {{ 'pil-actief' if status == 'bezig' }}">{{ status }}</span></h1>
   <p>📅 {{ seizoen['start_date']|dag }} t.e.m. {{ seizoen['end_date']|dag }}</p>
-  <p class="klein-tekst stil">Dit klassement staat los van de permanente ELO: bij de start van
+  <p class="klein-tekst stil">Dit klassement staat los van de permanente Aura: bij de start van
      elk seizoen begint iedereen opnieuw op 1000. Enkel leaguewedstrijden van dit seizoen tellen mee.</p>
 </section>
 
@@ -18,7 +18,7 @@
 <div class="paneel" data-paneel="spelers">
   <div class="kaart">
     <table class="tabel">
-      <thead><tr><th class="kol-rang">#</th><th>Speler</th><th class="kol-num">G</th><th class="kol-num">W</th><th class="kol-elo">Seizoens-ELO</th></tr></thead>
+      <thead><tr><th class="kol-rang">#</th><th>Speler</th><th class="kol-num">G</th><th class="kol-num">W</th><th class="kol-elo">Seizoens-Aura</th></tr></thead>
       <tbody>
         {% for r in sp_klassement %}
         <tr>
@@ -36,7 +36,7 @@
 <div class="paneel verborgen" data-paneel="teams">
   <div class="kaart">
     <table class="tabel">
-      <thead><tr><th class="kol-rang">#</th><th>Team</th><th class="kol-num">G</th><th class="kol-num">W</th><th class="kol-elo">Seizoens-ELO</th></tr></thead>
+      <thead><tr><th class="kol-rang">#</th><th>Team</th><th class="kol-num">G</th><th class="kol-num">W</th><th class="kol-elo">Seizoens-Aura</th></tr></thead>
       <tbody>
         {% for r in tm_klassement %}
         <tr>
@@ -65,7 +65,7 @@
     </ol>
   </div>
   <div class="kaart">
-    <h3>📈 Grootste ELO-klim (spelers)</h3>
+    <h3>📈 Grootste Aura-klim (spelers)</h3>
     <ol class="ere-lijst">
       {% for r in stats.spelers_klim %}<li><a class="profiel-link" href="{{ r.url }}">{{ r.naam }}</a> — {{ r.waarde }}</li>{% endfor %}
     </ol>
@@ -77,11 +77,27 @@
     </ol>
   </div>
   <div class="kaart">
-    <h3>📈 Grootste ELO-klim (teams)</h3>
+    <h3>📈 Grootste Aura-klim (teams)</h3>
     <ol class="ere-lijst">
       {% for r in stats.teams_klim %}<li><a class="profiel-link" href="{{ r.url }}">{{ r.naam }}</a> — {{ r.waarde }}</li>{% endfor %}
     </ol>
   </div>
+</div>
+{% endif %}
+
+{% if gepland %}
+<h2 class="sectiekop">Op de planning</h2>
+<div class="wedstrijd-lijst">
+  {% for g in gepland %}
+  <div class="kaart wedstrijd">
+    <div class="wedstrijd-teams">
+      <span class="team-naam"><a class="profiel-link" href="{{ url_for('team_profiel', team_id=g['team1_id']) }}">{{ namen[g['team1_id']] }}</a></span>
+      <span class="vs">vs</span>
+      <span class="team-naam"><a class="profiel-link" href="{{ url_for('team_profiel', team_id=g['team2_id']) }}">{{ namen[g['team2_id']] }}</a></span>
+    </div>
+    <div class="wedstrijd-meta">📅 {{ g['scheduled_at']|datum }}</div>
+  </div>
+  {% endfor %}
 </div>
 {% endif %}
 
@@ -95,15 +111,35 @@
     <div class="kaart wedstrijd">
       <div class="wedstrijd-teams">
         <span class="team-naam {{ 'winnaar' if g['winner_team_id'] == g['team1_id'] }}">
-          <a class="profiel-link" href="{{ url_for('team_profiel', team_id=g['team1_id']) }}">{{ namen[g['team1_id']] }}</a></span>
+          <a class="profiel-link" href="{{ url_for('team_profiel', team_id=g['team1_id']) }}">{{ namen[g['team1_id']] }}</a>
+          {% set d1 = deltas.get((g['id'], g['team1_id'])) %}
+          {% if d1 is not none %}
+            <span class="delta {{ 'plus' if d1 >= 0 else 'min' }}">{{ '+' if d1 >= 0 }}{{ d1|round|int }}</span>
+          {% endif %}
+        </span>
         <span class="vs">vs</span>
         <span class="team-naam {{ 'winnaar' if g['winner_team_id'] == g['team2_id'] }}">
-          <a class="profiel-link" href="{{ url_for('team_profiel', team_id=g['team2_id']) }}">{{ namen[g['team2_id']] }}</a></span>
+          <a class="profiel-link" href="{{ url_for('team_profiel', team_id=g['team2_id']) }}">{{ namen[g['team2_id']] }}</a>
+          {% set d2 = deltas.get((g['id'], g['team2_id'])) %}
+          {% if d2 is not none %}
+            <span class="delta {{ 'plus' if d2 >= 0 else 'min' }}">{{ '+' if d2 >= 0 }}{{ d2|round|int }}</span>
+          {% endif %}
+        </span>
       </div>
       <div class="wedstrijd-meta">
         {% if g['status'] == 'gespeeld' %}🏆 {{ namen[g['winner_team_id']] }} wint · {{ g['played_at']|datum }}
         {% else %}📅 Gepland op {{ g['scheduled_at']|datum }}{% endif %}
       </div>
+      {% if stats_per_game.get(g['id']) %}
+      <details class="wedstrijd-stats">
+        <summary>Statistieken van deze wedstrijd</summary>
+        <ul>
+          {% for s in stats_per_game[g['id']] %}
+          <li>{{ s['speler'] }} — {{ s['stat'] }}: <strong>{{ s['value']|round(1) }}</strong> {{ s['unit'] }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endif %}
     </div>
     {% endfor %}
   </div>

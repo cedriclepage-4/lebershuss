@@ -41,6 +41,12 @@
      open tot de meldingen overeenkomen of een organisator beslist.</p>
   {% endif %}
 
+  {% if m.wacht_op %}
+  <p class="klein-tekst wacht-tekst">🔒 Deze wedstrijd komt later. Speel en meld eerst
+     <strong>{{ namen[m.wacht_op['team1_id']] }} tegen {{ namen[m.wacht_op['team2_id']] }}</strong>
+     van {{ m.wacht_op['scheduled_at']|datum }} — de wedstrijden worden op volgorde
+     gespeeld.</p>
+  {% else %}
   <form method="post" action="{{ url_for('wedstrijd_melden', game_id=m.game['id']) }}" class="resultaat-form">
     {% if volgende %}<input type="hidden" name="volgende" value="{{ volgende }}">{% endif %}
     <div class="resultaat-rij">
@@ -82,4 +88,5 @@
       <button type="submit" class="knop primair">{{ 'Melding aanpassen' if m.eigen else 'Uitslag melden' }}</button>
     </div>
   </form>
+  {% endif %}
 </div>

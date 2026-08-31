@@ -6,14 +6,14 @@ Formaat (naar het model van de nieuwe Champions League):
 
 1. **Bracketfase** — álle teams zitten in één grote bracket. De organisator kiest
    hoeveel wedstrijden elk team speelt. De tegenstanders worden geloot uit de
-   potten (pot 1 = sterkste teams volgens permanente ELO), zodat elk team een
+   potten (pot 1 = sterkste teams volgens permanente Aura), zodat elk team een
    evenwichtig programma krijgt en niemand twee keer dezelfde tegenstander loot.
 2. **Shootouts** — staan er na de bracketfase teams gelijk op punten én beslist
    dat over een knockoutticket, dan genereert het toernooi automatisch extra
    beslissingswedstrijden. Het onderlinge resultaat telt enkel als álle betrokken
    teams onderling gespeeld hebben (anders vergelijk je ongelijke steekproeven);
    in alle andere gevallen volgt een shootout — winnen of verliezen, gelijk bestaat
-   niet. Een shootout beslist enkel wie doorstoot en telt niet mee voor de ELO.
+   niet. Een shootout beslist enkel wie doorstoot en telt niet mee voor de Aura.
 3. **Knockout** — de beste 2, 4, 8, 16, ... teams gaan door. Nummer 1 speelt
    tegen de laagste geplaatste, enzovoort, zodat de nummers 1 en 2 elkaar pas in
    de finale kunnen tegenkomen.
@@ -45,15 +45,20 @@ def locaties(db, tid):
                       "ORDER BY id", (tid,)).fetchall()
 
 
-def deelnemers(db, tid):
-    """Teams van dit toernooi, met naam, permanente ELO en de twee spelers."""
-    rijen = db.execute("""
-        SELECT tt.team_id AS id, tt.pot, tt.seed, tt.start_elo,
+def deelnemers(db, tid, ook_teruggetrokken=False):
+    """Teams van dit toernooi, met naam, permanente Aura en de twee spelers.
+
+    Wie zich teruggetrokken heeft, doet niet meer mee: die valt uit de stand, uit
+    de loting en uit alle berekeningen.
+    """
+    rijen = db.execute(f"""
+        SELECT tt.team_id AS id, tt.pot, tt.seed, tt.start_elo, tt.teruggetrokken,
                t.name AS naam, t.elo, t.avatar,
                t.player1_id, t.player2_id
         FROM tournament_teams tt
         JOIN teams t ON t.id = tt.team_id
         WHERE tt.tournament_id = ?
+          {"" if ook_teruggetrokken else "AND tt.teruggetrokken = 0"}
         ORDER BY t.elo DESC, t.name
     """, (tid,)).fetchall()
     namen = {r["id"]: r["naam"] for r in db.execute(
@@ -99,7 +104,7 @@ def lot_sleutel(tid, team_id):
     """Een vaste, willekeurig ogende waarde per team binnen één toernooi.
 
     Nodig om teams te ordenen die écht niet van elkaar te onderscheiden zijn —
-    bijvoorbeeld op een eerste toernooi, wanneer iedereen nog op 1000 ELO staat.
+    bijvoorbeeld op een eerste toernooi, wanneer iedereen nog op 1000 Aura staat.
     Zonder dit zou de alfabetische naam beslissen: “Team A” zou dan altijd boven
     “Team Z” eindigen, wat systematisch oneerlijk is.
 
@@ -109,6 +114,12 @@ def lot_sleutel(tid, team_id):
     """
     ruw = hashlib.sha1(f"{tid}:{team_id}".encode()).hexdigest()
     return int(ruw[:12], 16)
+
+
+# Vier potten. Meer levert bij deze aantallen niets extra's op en minder maakt
+# het onderscheid grof; het is bovendien één instelling minder om over na te
+# denken. Staat iedereen op dezelfde rating, dan vervallen de potten sowieso.
+STANDAARD_POTTEN = 4
 
 
 def potten_zinvol(teams):
@@ -121,18 +132,18 @@ def potten_zinvol(teams):
     return len({round(t["elo"], 6) for t in teams}) > 1
 
 
-def potten_getoond(db, tid):
-    """Zijn er in dit gelote toernooi meerdere potten? Zo niet: niet tonen."""
+def potten_aantal(db, tid):
+    """Over hoeveel potten is dit toernooi geloot? 1 (of 0) = geen potten."""
     potten = {r["pot"] for r in db.execute(
         "SELECT pot FROM tournament_teams WHERE tournament_id = ?", (tid,))}
-    return len(potten - {None}) > 1
+    return len(potten - {None})
 
 
 def potten_verdelen(teams, aantal_potten, rng=None):
-    """Verdeel de teams (gesorteerd op permanente ELO) over de potten.
+    """Verdeel de teams (gesorteerd op permanente Aura) over de potten.
 
     Geeft {team_id: potnummer} terug; pot 1 bevat de sterkste teams. Teams met
-    exact dezelfde ELO worden door elkaar geschud: op een eerste toernooi staat
+    exact dezelfde Aura worden door elkaar geschud: op een eerste toernooi staat
     iedereen op 1000, en dan mag de alfabetische volgorde niet bepalen wie in
     welke pot belandt.
     """
@@ -140,7 +151,7 @@ def potten_verdelen(teams, aantal_potten, rng=None):
     aantal_potten = max(1, min(aantal_potten, n))
     teams = list(teams)
     if rng is not None:
-        rng.shuffle(teams)          # sorted() is stabiel: gelijke ELO blijft geschud
+        rng.shuffle(teams)          # sorted() is stabiel: gelijke Aura blijft geschud
     gesorteerd = sorted(teams, key=lambda t: -t["elo"])
     basis, rest = divmod(n, aantal_potten)
     pot_van = {}
@@ -262,7 +273,26 @@ def _magere_ronde_naar_het_midden(rondes):
     return vol[:beste] + mager + vol[beste:]
 
 
-def verdeel_in_rondes(paren, rng=None, max_per_ronde=None, pogingen=150):
+def _past_op_de_tafels(rondes, plafond):
+    """Kan dit schema zo gespeeld worden: genoeg tafels, niemand twee keer tegelijk?"""
+    for ronde in rondes:
+        if len(ronde) > plafond:
+            return False
+        teams = [t for paar in ronde for t in paar]
+        if len(set(teams)) != len(teams):
+            return False
+    return True
+
+
+def _beste_van(gevonden, voorstel, plafond):
+    """Kies tussen wat de zoektocht vond en de ronden van de loting zelf."""
+    if (voorstel and len(voorstel) < len(gevonden)
+            and _past_op_de_tafels(voorstel, plafond)):
+        return _magere_ronde_naar_het_midden([list(r) for r in voorstel])
+    return _magere_ronde_naar_het_midden(gevonden)
+
+
+def verdeel_in_rondes(paren, rng=None, max_per_ronde=None, pogingen=150, voorstel=None):
     """Verdeel alle affiches over zo weinig mogelijk speelrondes.
 
     Een speelronde is één tijdstip: alle wedstrijden erin worden tegelijk
@@ -283,6 +313,14 @@ def verdeel_in_rondes(paren, rng=None, max_per_ronde=None, pogingen=150):
     plafond = max(1, min(plafond, len(teams) // 2))
     graad = max(sum(1 for paar in paren if t in paar) for t in teams)
     minimaal = max(graad, math.ceil(len(paren) / plafond))
+
+    # De loting heeft de wedstrijden al in ronden gezet waarin elk team precies
+    # één keer speelt. Zijn er genoeg tafels voor zo'n ronde, dan is dat meteen
+    # het best denkbare schema: iedereen speelt elke ronde, niemand zit te
+    # wachten. Opnieuw gaan puzzelen kan er dan enkel slechter van worden — en
+    # dat gebeurde ook: 14 teams op 7 tafels werden 6 speelrondes in plaats van 5.
+    if voorstel and len(voorstel) <= minimaal and _past_op_de_tafels(voorstel, plafond):
+        return _magere_ronde_naar_het_midden([list(r) for r in voorstel])
 
     for aantal in range(minimaal, len(paren) + 1):
         beste = None
@@ -316,9 +354,9 @@ def verdeel_in_rondes(paren, rng=None, max_per_ronde=None, pogingen=150):
                 if beste is None or len(gevuld) < len(beste):
                     beste = gevuld
                 if len(gevuld) == aantal:
-                    return _magere_ronde_naar_het_midden(gevuld)
+                    return _beste_van(gevuld, voorstel, plafond)
         if beste:
-            return _magere_ronde_naar_het_midden(beste)
+            return _beste_van(beste, voorstel, plafond)
     return [[paar] for paar in paren]        # noodoplossing: alles apart
 
 
@@ -449,7 +487,7 @@ def genereer(db, tid, rng=None):
     # zeggen potten niets: elke indeling is dan even willekeurig. We loten dan
     # gewoon vrij en laten de potten uit beeld, in plaats van de zaal een
     # rangschikking voor te schotelen die nergens op slaat.
-    aantal_potten = t["potten"] if potten_zinvol(teams) else 1
+    aantal_potten = STANDAARD_POTTEN if potten_zinvol(teams) else 1
     pot_van = potten_verdelen(teams, aantal_potten, rng)
     rng = rng or random.Random()
 
@@ -464,7 +502,8 @@ def genereer(db, tid, rng=None):
     # het hele toernooi heen in, zodat er nooit een tafel stilstaat.
     alle_paren = [paar for ronde in rondes for paar in ronde]
     speelrondes = verdeel_in_rondes(alle_paren, rng,
-                                    max_per_ronde=len(tafel_ids) or None)
+                                    max_per_ronde=len(tafel_ids) or None,
+                                    voorstel=rondes)
     gepland, _einde = _plan(speelrondes, tafel_ids, _starttijd(t), t["slot_minuten"])
 
     db.execute("DELETE FROM games WHERE tournament_id = ?", (tid,))
@@ -488,6 +527,250 @@ def genereer(db, tid, rng=None):
                   f"verdeeld over {len(gepland)} speelrondes "
                   f"(± {duur // 60}u{duur % 60:02d} met "
                   f"{len(tafel_ids) or 'onbeperkt'} tafel(s)).")
+
+
+def _aanvulparen(deficit, ontmoet, rng, pogingen=4000):
+    """Zoek nieuwe affiches zodat elk team zijn tekort precies wegwerkt.
+
+    `deficit` = {team: aantal wedstrijden dat het nog moet spelen}
+    `ontmoet` = {team: set van teams waartegen het al speelde}
+
+    Niemand speelt twee keer dezelfde tegenstander. Het moeilijkste team eerst
+    koppelen (dat met het grootste tekort) — anders blijft er op het einde een
+    ploeg over die enkel nog tegen zichzelf zou kunnen.
+    """
+    if sum(deficit.values()) % 2:
+        return None
+    for _ in range(pogingen):
+        rest = dict(deficit)
+        al = {t: set(v) for t, v in ontmoet.items()}
+        paren = []
+        gelukt = True
+        while any(rest.values()):
+            a = max(rest, key=lambda t: (rest[t], rng.random()))
+            if rest[a] == 0:
+                break
+            kandidaten = [b for b in rest
+                          if b != a and rest[b] > 0 and b not in al[a]]
+            if not kandidaten:
+                gelukt = False
+                break
+            b = max(kandidaten, key=lambda t: (rest[t], rng.random()))
+            paren.append((a, b))
+            al[a].add(b)
+            al[b].add(a)
+            rest[a] -= 1
+            rest[b] -= 1
+        if gelukt and not any(rest.values()):
+            return paren
+    return None
+
+
+def _terugtrek_situatie(db, tid, blijvers, bracket, bevries_lopende):
+    """Wat ligt er vast als deze ploeg wegvalt, en wie speelde al tegen wie?"""
+    open_slots = sorted({g["scheduled_at"] for g in bracket if g["status"] == "gepland"})
+    huidige = open_slots[0] if open_slots else None
+    vast = [g for g in bracket
+            if g["status"] == "gespeeld"
+            or (bevries_lopende and g["scheduled_at"] == huidige)]
+    ontmoet = {b: set() for b in blijvers}
+    aantal = {b: 0 for b in blijvers}
+    for g in vast:
+        a, b = g["team1_id"], g["team2_id"]
+        if a in ontmoet and b in ontmoet:
+            ontmoet[a].add(b)
+            ontmoet[b].add(a)
+            aantal[a] += 1
+            aantal[b] += 1
+    return {g["id"] for g in vast}, ontmoet, aantal, max(aantal.values(), default=0)
+
+
+def terugtrek_opties(db, tid, team_id):
+    """Op hoeveel wedstrijden per team kan je uitkomen als deze ploeg wegvalt?
+
+    Het totaal aantal wedstrijden moet even zijn, dus met een oneven aantal
+    overblijvende ploegen kan enkel een even aantal wedstrijden per team — bij
+    13 ploegen dus 4 of 6, nooit 5. Blijft er een even aantal ploegen over, dan
+    kan het aantal gelijk blijven of er eentje bij.
+
+    Elke optie wordt echt doorgerekend: wat hier in de lijst staat, kan ook.
+    De ronde die op dat moment gespeeld wordt, blijft altijd staan: een lopende
+    wedstrijd afbreken doen we niet. Past er daardoor geen enkel schema meer,
+    dan is de lijst leeg en kan er niet meer teruggetrokken worden.
+    """
+    t = toernooi(db, tid)
+    if not t or t["status"] != "bracket":
+        return [], False
+    blijvers = [d["id"] for d in deelnemers(db, tid) if d["id"] != team_id]
+    if len(blijvers) < 4:
+        return [], False
+    bracket = [g for g in db.execute(
+        "SELECT * FROM games WHERE tournament_id = ? AND fase = 'bracket' "
+        "ORDER BY scheduled_at, id", (tid,))
+        if team_id not in (g["team1_id"], g["team2_id"])]
+    m = len(blijvers)
+    tafels = max(1, len(locaties(db, tid)))
+
+    # De ronde die nu op tafel ligt blijft altijd staan. Een lopende wedstrijd
+    # afbreken is het ergste wat je kan doen: die mensen staan te spelen. Komt
+    # het daarmee niet uit, dan is terugtrekken gewoon geen optie meer — in de
+    # laatste ronde weet je toch al lang dat die ploeg niet meer komt.
+    _, ontmoet, aantal, ondergrens = _terugtrek_situatie(db, tid, blijvers,
+                                                         bracket, True)
+    opties = []
+    for doel in range(max(ondergrens, t["bracket_ronden"] - 1), t["bracket_ronden"] + 2):
+        if doel > m - 1 or (m * doel) % 2:
+            continue
+        deficit = {b: doel - aantal[b] for b in blijvers}
+        if any(v < 0 for v in deficit.values()):
+            continue
+        nieuw = ([] if not any(deficit.values())
+                 else _aanvulparen(deficit, ontmoet, random.Random(doel), pogingen=800))
+        if nieuw is None:
+            continue
+        opties.append({
+            "doel": doel,
+            "nieuw": len(nieuw),
+            "slots": math.ceil(len(nieuw) / tafels),
+            "minuten": math.ceil(len(nieuw) / tafels) * t["slot_minuten"],
+            "verschil": doel - t["bracket_ronden"],
+        })
+    if not opties:
+        return []
+    # Voorkeur: de avond niet langer maken, en zo dicht mogelijk bij wat
+    # aangekondigd was.
+    beste = min(opties, key=lambda o: (o["verschil"] > 0, abs(o["verschil"])))
+    for o in opties:
+        o["standaard"] = (o is beste)
+    return opties
+
+
+def terugtrekken(db, tid, team_id, doel=None, rng=None):
+    """Een team komt niet (meer) opdagen: schrap het en loot de rest opnieuw.
+
+    Een forfaitzege is geen echte zege. Wie toevallig tegen de afwezige ploeg
+    geloot was, kreeg drie punten cadeau; wie een zwaar programma had, niet. Dat
+    scheelt genoeg om over de streep te beslissen, dus lossen we het op door
+    iedereen even veel échte wedstrijden te laten spelen.
+
+    Wat er gebeurt:
+      * alle wedstrijden van de afwezige ploeg vervallen — ook de forfaits die al
+        ingevuld waren, want anders houdt wie vroeg tegen hen speelde een
+        voordeel op wie laat tegen hen zou spelen;
+      * gespeelde wedstrijden en de ronde die nu bezig is blijven staan;
+      * alle latere affiches worden opnieuw geloot, zodat elk overblijvend team
+        op hetzelfde aantal wedstrijden uitkomt.
+
+    Dat aantal kan niet altijd gelijk blijven: met 13 ploegen die elk 5 partijen
+    spelen zou je 32,5 wedstrijden nodig hebben. Dan zakt het doel met één.
+
+    Geeft (gelukt, boodschap) terug.
+    """
+    rng = rng or random.Random()
+    t = toernooi(db, tid)
+    if not t:
+        return False, "Toernooi niet gevonden."
+    if t["status"] not in ("opzet", "bracket"):
+        return False, ("De bracketfase is al afgelopen. Terugtrekken kan enkel "
+                       "zolang er nog groepswedstrijden op het programma staan.")
+    rij = db.execute("SELECT * FROM tournament_teams WHERE tournament_id = ? AND "
+                     "team_id = ?", (tid, team_id)).fetchone()
+    if not rij:
+        return False, "Dat team doet niet mee aan dit toernooi."
+    if rij["teruggetrokken"]:
+        return False, "Dat team is al teruggetrokken."
+
+    blijvers = [d["id"] for d in deelnemers(db, tid) if d["id"] != team_id]
+    if len(blijvers) < 4:
+        return False, "Dan blijven er te weinig teams over om verder te spelen."
+
+    # Welk aantal wedstrijden per team wordt het? De organisator mag kiezen;
+    # zonder keuze houden we het zo dicht mogelijk bij wat aangekondigd was.
+    if t["status"] == "bracket":
+        opties = terugtrek_opties(db, tid, team_id)
+        if not opties:
+            return False, ("Hiervoor is het te laat: er valt geen eerlijk schema meer te "
+                           "maken zonder de wedstrijden die nu bezig zijn af te breken. "
+                           "Laat de laatste ronde gewoon uitspelen; de forfaits blijven "
+                           "staan zoals ze zijn.")
+        haalbaar = [o["doel"] for o in opties]
+        if doel is None:
+            doel = next(o["doel"] for o in opties if o["standaard"])
+        elif doel not in haalbaar:
+            return False, (f"{doel} wedstrijden per team kan hier niet. Mogelijk is: "
+                           + " of ".join(str(x) for x in haalbaar) + ".")
+
+    # 1. De afwezige ploeg valt volledig weg.
+    db.execute("UPDATE tournament_teams SET teruggetrokken = 1 WHERE tournament_id = ? "
+               "AND team_id = ?", (tid, team_id))
+    db.execute("DELETE FROM game_reports WHERE game_id IN (SELECT id FROM games "
+               "WHERE tournament_id = ? AND (team1_id = ? OR team2_id = ?))",
+               (tid, team_id, team_id))
+    db.execute("DELETE FROM games WHERE tournament_id = ? AND (team1_id = ? OR team2_id = ?)",
+               (tid, team_id, team_id))
+    db.execute("DELETE FROM games WHERE tournament_id = ? AND fase IN ('shootout','knockout')",
+               (tid,))
+    db.execute("UPDATE tournaments SET status = 'bracket' WHERE id = ?", (tid,))
+    db.commit()
+
+    if t["status"] == "opzet":
+        return True, "Het team is verwijderd; het toernooi was nog niet geloot."
+
+    # 2. Wat ligt vast? Alles wat al gespeeld is, en liefst ook de ronde die nu
+    #    op tafel ligt — die wil je niet onder de spelers vandaan trekken. Lukt
+    #    het daarmee niet (bv. als de ploeg pas in de làatste ronde afhaakt),
+    #    dan geven we die lopende ronde alsnog vrij: beter een affiche die
+    #    verandert dan een avond die vastloopt.
+    bracket = db.execute("SELECT * FROM games WHERE tournament_id = ? AND fase = 'bracket' "
+                         "ORDER BY scheduled_at, id", (tid,)).fetchall()
+
+    vast_ids, ontmoet, aantal, ondergrens = _terugtrek_situatie(
+        db, tid, blijvers, bracket, True)
+    if doel < ondergrens:
+        db.rollback()
+        return False, "Er zijn al teams die meer wedstrijden gespeeld hebben dan dat."
+    later = [g for g in bracket if g["id"] not in vast_ids]
+
+    # 4. De latere affiches vervallen; er komt een nieuwe loting voor in de plaats.
+    for g in later:
+        db.execute("DELETE FROM game_reports WHERE game_id = ?", (g["id"],))
+        db.execute("DELETE FROM games WHERE id = ?", (g["id"],))
+    db.commit()
+
+    deficit = {b: doel - aantal[b] for b in blijvers}
+    nieuw = _aanvulparen(deficit, ontmoet, rng) if any(deficit.values()) else []
+    if nieuw is None:
+        db.rollback()
+        return False, ("Er is geen schema te vinden waarin iedereen even veel speelt "
+                       "zonder dezelfde tegenstander twee keer te treffen.")
+
+    # 5. Inplannen ná wat er al staat.
+    if nieuw:
+        tafel_ids = [l["id"] for l in locaties(db, tid)]
+        start = _laatste_moment(db, tid, _starttijd(t)) + timedelta(minutes=t["slot_minuten"])
+        speelrondes = verdeel_in_rondes(nieuw, rng, max_per_ronde=len(tafel_ids) or None)
+        gepland, _ = _plan(speelrondes, tafel_ids, start, t["slot_minuten"])
+        volgnr = (db.execute("SELECT COALESCE(MAX(ronde), 0) AS n FROM games WHERE "
+                             "tournament_id = ? AND fase = 'bracket'", (tid,)).fetchone()["n"])
+        for paren in gepland:
+            volgnr += 1
+            for a, b, moment, loc in paren:
+                db.execute("""
+                    INSERT INTO games (team1_id, team2_id, tournament_id, fase, ronde,
+                                       scheduled_at, location_id)
+                    VALUES (?, ?, ?, 'bracket', ?, ?, ?)
+                """, (a, b, tid, volgnr, moment.strftime(TIJDFORMAAT), loc))
+    if doel != t["bracket_ronden"]:
+        db.execute("UPDATE tournaments SET bracket_ronden = ? WHERE id = ?", (doel, tid))
+    db.commit()
+
+    naam = db.execute("SELECT name FROM teams WHERE id = ?", (team_id,)).fetchone()["name"]
+    stuk = (f"iedereen speelt nu {doel} wedstrijden in plaats van "
+            f"{t['bracket_ronden']}" if doel != t["bracket_ronden"]
+            else f"iedereen speelt nog altijd {doel} wedstrijden")
+    return True, (f"“{naam}” is teruggetrokken. Al hun wedstrijden — ook de al "
+                  f"ingevulde forfaits — zijn geschrapt en er zijn "
+                  f"{len(nieuw)} nieuwe affiches geloot, zodat {stuk}.")
 
 
 def herloot(db, tid):
@@ -541,13 +824,13 @@ def winstkwaliteit(db, tid, punten_van):
 
 
 def elo_na_bracketfase(db, tid):
-    """Hoeveel ELO elk team wón of verlóór tijdens de bracketfase.
+    """Hoeveel Aura elk team wón of verlóór tijdens de bracketfase.
 
     Dit is een **toernooikracht**: iedereen begint op nul, ongeacht met welke
     rating hij binnenkwam. Enkel wat je vanavond deed telt mee. Een team dat
     even veel punten pakte maar tegen sterkere tegenstanders, staat hoger.
 
-    Waarom niet gewoon de ELO zelf? Omdat die op een eerste toernooi voor
+    Waarom niet gewoon de Aura zelf? Omdat die op een eerste toernooi voor
     iedereen 1000 is (en dus niets zegt), en later juist de geschiedenis zou
     laten meespelen: wie vorige maand goed speelde, zou vandaag een streepje
     voor krijgen bij een gelijke stand. Dat willen we niet.
@@ -604,7 +887,7 @@ def stand(db, tid, hypothese=None):
 
     Geeft een lijst dicts terug, gesorteerd van 1 naar laatst:
       positie, team_id, naam, pot, gespeeld, winst, verlies, punten,
-      doorstoot (bool), gedeeld (bool: gelijk geëindigd, ELO besliste),
+      doorstoot (bool), gedeeld (bool: gelijk geëindigd, Aura besliste),
       onbeslist (bool: er is nog een shootout nodig)
 
     Met `hypothese` ({game_id: winnaar_id}) reken je een "wat als" door zonder
@@ -624,11 +907,11 @@ def stand(db, tid, hypothese=None):
 
     rijen = {}
     for tid_, team in teams.items():
-        # start_elo = de permanente ELO op het moment van de loting (voor de potten).
+        # start_elo = de permanente Aura op het moment van de loting (voor de potten).
         start = team["start_elo"] if team["start_elo"] is not None else team["elo"]
         rijen[tid_] = {"team_id": tid_, "naam": team["naam"], "pot": team["pot"],
                        "elo": start,
-                       # Toernooikracht = de ELO die je vanavond won of verloor.
+                       # Toernooikracht = de Aura die je vanavond won of verloor.
                        # Laatste tiebreak vóór de loting: wie zijn punten tegen
                        # sterkere tegenstanders pakte, staat hoger. Wie nog niet
                        # speelde staat op 0.
@@ -654,7 +937,7 @@ def stand(db, tid, hypothese=None):
             rijen[g["winner_team_id"]]["shootouts"] += 1
 
     # Kwaliteit van je overwinningen en zwaarte van je programma: die beslissen
-    # vóór de ELO, omdat ze uit de eindstand komen en dus niet afhangen van het
+    # vóór de Aura, omdat ze uit de eindstand komen en dus niet afhangen van het
     # moment waarop je iemand trof.
     punten_van = {team_id: r["punten"] for team_id, r in rijen.items()}
     kwaliteit, programma = winstkwaliteit(db, tid, punten_van)
@@ -662,7 +945,7 @@ def stand(db, tid, hypothese=None):
         r["kwaliteit"] = kwaliteit.get(team_id, 0)
         r["programma"] = programma.get(team_id, 0)
 
-    # punten → onderling → shootouts → kwaliteit → programma → ELO → loting.
+    # punten → onderling → shootouts → kwaliteit → programma → Aura → loting.
     lijst = list(rijen.values())
     lijst.sort(key=lambda r: (-r["punten"], -r["kwaliteit"], -r["programma"],
                               -r["kracht"], lot_sleutel(tid, r["team_id"])))
@@ -950,7 +1233,7 @@ def tiebreak_groepen(db, tid):
         else:
             if len({round(r["kracht"], 6) for r in rijen}) > 1:
                 grond = ("kwaliteit en programma zijn gelijk, dus beslist de "
-                         "toernooikracht: de ELO die je vanavond won of verloor.")
+                         "toernooikracht: de Aura die je vanavond won of verloor.")
             else:
                 grond = ("deze teams zijn op geen enkele manier meer van elkaar te "
                          "onderscheiden: de onderlinge volgorde is geloot.")
@@ -1341,6 +1624,30 @@ def evalueer(db, tid):
         meldingen.append(f"De bracketfase is afgelopen — de laatste "
                          f"{t['ko_teams']} teams zijn geloot in het knockoutschema.")
     return meldingen
+
+
+def eerdere_wedstrijd(db, game):
+    """Moet een van beide teams eerst nog een vroegere wedstrijd afwerken?
+
+    De kalender zet de wedstrijden in speelrondes, en je hoort ze in die volgorde
+    af te werken. Kan je de uitslag van je derde partij al invullen terwijl je
+    eerste nog openstaat, dan klopt de stand tussendoor niet — en de Aura wordt
+    chronologisch herrekend, dus de volgorde waarin uitslagen binnenkomen doet
+    er echt toe.
+
+    Geeft de eerste openstaande vroegere wedstrijd terug, of None.
+    """
+    if not game["tournament_id"] or game["fase"] != "bracket" or not game["scheduled_at"]:
+        return None                       # league, shootout en knockout: niet van toepassing
+    return db.execute("""
+        SELECT * FROM games
+        WHERE tournament_id = ? AND fase = 'bracket' AND status = 'gepland'
+          AND scheduled_at < ?
+          AND (team1_id IN (?, ?) OR team2_id IN (?, ?))
+        ORDER BY scheduled_at, id LIMIT 1
+    """, (game["tournament_id"], game["scheduled_at"],
+          game["team1_id"], game["team2_id"],
+          game["team1_id"], game["team2_id"])).fetchone()
 
 
 def mag_wissen(db, game):

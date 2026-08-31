@@ -17,7 +17,7 @@
     </div>
   </div>
   <div class="held-cijfers">
-    <div class="cijfer"><strong>{{ team['elo']|elo }}</strong><span>team-ELO</span></div>
+    <div class="cijfer"><strong>{{ team['elo']|elo }}</strong><span>team-Aura</span></div>
     <div class="cijfer"><strong>{{ stats['gespeeld'] }}</strong><span>gespeeld</span></div>
     <div class="cijfer"><strong>{{ stats['winst'] }}</strong><span>gewonnen</span></div>
     <div class="cijfer"><strong>{{ verlies }}</strong><span>verloren</span></div>
@@ -48,7 +48,7 @@
 {% include "_palmares.html" %}
 
 {% if punten|length >= 2 %}
-<h2 class="sectiekop">ELO-verloop</h2>
+<h2 class="sectiekop">Aura-verloop</h2>
 <div class="kaart">
   <div id="elo-grafiek" class="elo-grafiek"></div>
   <p class="stil klein-tekst">Beweeg over de lijn om per wedstrijd de rating én de plaats
@@ -61,7 +61,7 @@
 {% if historiek %}
 <div class="kaart">
   <table class="tabel compact">
-    <thead><tr><th>Datum</th><th>Soort</th><th>Tegen</th><th>Resultaat</th><th class="kol-num">ELO</th></tr></thead>
+    <thead><tr><th>Datum</th><th>Soort</th><th>Tegen</th><th>Resultaat</th><th class="kol-num">Aura</th></tr></thead>
     <tbody>
       {% for h in historiek %}
       <tr>

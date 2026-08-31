@@ -6,12 +6,12 @@
 <h2 class="sectiekop">Seizoenen
   {% if not league_zichtbaar %}<span class="pil pil-verborgen">niet zichtbaar voor spelers</span>{% endif %}</h2>
 <div class="kaart">
-  <p class="klein-tekst stil">Elk seizoen start op 1000 ELO en heeft zijn eigen klassement.
+  <p class="klein-tekst stil">Elk seizoen start op 1000 Aura en heeft zijn eigen klassement.
      De plaats hieronder is die in het seizoensklassement.</p>
   <table class="tabel compact">
     <thead>
       <tr><th>Seizoen</th><th>Plaats</th><th class="kol-num">G</th><th class="kol-num">W</th>
-          <th class="kol-num verbergen-mobiel">V</th><th class="kol-elo">ELO</th></tr>
+          <th class="kol-num verbergen-mobiel">V</th><th class="kol-elo">Aura</th></tr>
     </thead>
     <tbody>
       {% for s in seizoen_ratings %}
@@ -41,9 +41,9 @@
 <h2 class="sectiekop">Toernooien</h2>
 <div class="kaart">
   <p class="klein-tekst stil">
-     {%- if league_zichtbaar %}Toernooiwedstrijden tellen mee voor de permanente ELO,
+     {%- if league_zichtbaar %}Toernooiwedstrijden tellen mee voor de permanente Aura,
      niet voor een seizoensklassement.
-     {%- else %}Elke toernooiwedstrijd telt mee voor de permanente ELO.{% endif %}
+     {%- else %}Elke toernooiwedstrijd telt mee voor de permanente Aura.{% endif %}
      {% if titels %}<strong>{{ titels }}× toernooiwinnaar.</strong>{% endif %}</p>
   <table class="tabel compact">
     <thead>

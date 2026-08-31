@@ -155,7 +155,7 @@
   <div class="zoekbalk"><input type="search" placeholder="Zoek een speler op naam of nummer…" data-zoek="#spelertabel"></div>
   <div class="tabel-venster">
   <table class="tabel" id="spelertabel">
-    <thead><tr><th class="kol-rang">#</th><th>Naam</th><th>Foto</th><th class="kol-elo">ELO</th><th class="kol-num verbergen-mobiel">Wedstrijden in {{ maand_label }}</th><th>Status</th><th>Acties</th></tr></thead>
+    <thead><tr><th class="kol-rang">#</th><th>Naam</th><th>Foto</th><th class="kol-elo">Aura</th><th class="kol-num verbergen-mobiel">Wedstrijden in {{ maand_label }}</th><th>Status</th><th>Acties</th></tr></thead>
     <tbody>
       {% for p in spelers %}
       <tr>
@@ -288,7 +288,7 @@
   <div class="zoekbalk"><input type="search" placeholder="Zoek een team of een speler…" data-zoek="#teamtabel"></div>
   <div class="tabel-venster">
   <table class="tabel compact" id="teamtabel">
-    <thead><tr><th>Team</th><th class="wikkel">Spelers</th><th>Naam wijzigen</th><th>Foto</th><th class="kol-elo">ELO</th><th>Status</th><th>Verwijderen</th></tr></thead>
+    <thead><tr><th>Team</th><th class="wikkel">Spelers</th><th>Naam wijzigen</th><th>Foto</th><th class="kol-elo">Aura</th><th>Status</th><th>Verwijderen</th></tr></thead>
     <tbody>
       {% for t in teams %}
       <tr>
@@ -324,7 +324,7 @@
             {% else %}
             <form method="post" action="{{ url_for('team_definitief_verwijderen', team_id=t.id) }}">
               <p class="klein-tekst">Wist <strong>{{ t.naam }}</strong> en zijn
-                 {{ t.wedstrijden }} wedstrijd(en). Alle ELO wordt herberekend alsof
+                 {{ t.wedstrijden }} wedstrijd(en). Alle Aura wordt herberekend alsof
                  die nooit gespeeld zijn. Typ <code>verwijder</code> om te bevestigen.</p>
               <div class="rij-form">
                 <input type="text" name="bevestiging" placeholder="verwijder" autocomplete="off"

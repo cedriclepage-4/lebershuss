@@ -18,7 +18,7 @@
 <body>
   <header class="topbar">
     <div class="wrap topbar-inner">
-      <a class="logo" href="{{ url_for('index') if league_toegankelijk else url_for('toernooien') }}">
+      <a class="logo" href="{{ url_for('index') }}">
         <img class="logo-beeld" src="{{ url_for('statisch', bestand=logo_bestand) }}" alt="Leberschuss Tonzent logo">
         <span>
           <strong>Leberschuss <span class="merk-org">Tonzent</span></strong>
@@ -41,24 +41,34 @@
 
     <div class="sectiebalk">
       <div class="wrap sectie-inner">
-        {# Zonder leaguegedeelte is er niets te kiezen: dan tonen we die balk niet. #}
-        {% if league_toegankelijk %}
         <div class="sectie-keuze">
-          <a class="sectie-knop {{ 'actief' if sectie == 'liga' }}" href="{{ url_for('index') }}">
+          <a class="sectie-knop {{ 'actief' if sectie == 'home' }}" href="{{ url_for('index') }}">
+            <span class="sectie-icoon">🏠</span> Home
+          </a>
+          {# Staat het leaguegedeelte uit, dan is er voor spelers niets te zien. #}
+          {% if league_toegankelijk %}
+          <a class="sectie-knop {{ 'actief' if sectie == 'liga' }}" href="{{ url_for('seizoenen') }}">
             <span class="sectie-icoon">🏆</span> League
             {% if not league_zichtbaar %}<span class="pil pil-verborgen">verborgen</span>{% endif %}
           </a>
+          {% endif %}
           <a class="sectie-knop {{ 'actief' if sectie == 'toernooi' }}" href="{{ url_for('toernooien') }}">
             <span class="sectie-icoon">🥇</span> Toernooi
           </a>
         </div>
-        {% endif %}
+        {# Hoort deze pagina bij geen enkel deel (profiel, inloggen, paneel),
+           dan tonen we ook geen subnavigatie: die zou bij niets horen. #}
+        {% if sectie %}
         <nav class="subnav">
-          {% if sectie == 'liga' %}
-            <a href="{{ url_for('index') }}" class="{{ 'actief' if request.path == '/' }}">Klassement</a>
-            <a href="{{ url_for('wedstrijden') }}" class="{{ 'actief' if request.path.startswith('/wedstrijden') }}">Wedstrijden</a>
+          {% if sectie == 'home' %}
+            <a href="{{ url_for('index') }}" class="{{ 'actief' if request.path == '/' }}">Globaal klassement</a>
             <a href="{{ url_for('statistieken') }}" class="{{ 'actief' if request.path.startswith('/statistieken') }}">Statistieken</a>
-            <a href="{{ url_for('seizoenen') }}" class="{{ 'actief' if request.path.startswith('/seizoen') }}">Seizoenen</a>
+          {% elif sectie == 'liga' %}
+            <a href="{{ url_for('seizoenen') }}" class="{{ 'actief' if request.path == '/seizoenen' }}">Alle seizoenen</a>
+            {% if huidig_seizoen is defined and huidig_seizoen %}
+              <a href="{{ url_for('seizoen_detail', seizoen_id=huidig_seizoen['id']) }}"
+                 class="{{ 'actief' if request.path.startswith('/seizoen/' ~ huidig_seizoen['id']) }}">{{ huidig_seizoen['name'] }}</a>
+            {% endif %}
           {% else %}
             <a href="{{ url_for('toernooien') }}" class="{{ 'actief' if request.path == '/toernooien' }}">Alle toernooien</a>
             {% if huidig_toernooi is defined and huidig_toernooi %}
@@ -67,11 +77,20 @@
             {% endif %}
           {% endif %}
         </nav>
+        {% endif %}
       </div>
     </div>
   </header>
 
   <main class="wrap">
+    {% if terug %}
+    {# Eén stap terug. De href is het vangnet: wie hier rechtstreeks binnenkomt
+       (QR-code, gedeelde link) heeft geen geschiedenis om op terug te vallen. #}
+    <a class="terug-knop" href="{{ terug.url }}" data-terug>
+      <span aria-hidden="true">‹</span> <span class="terug-label">{{ terug.label }}</span>
+    </a>
+    {% endif %}
+
     {% with berichten = get_flashed_messages(with_categories=true) %}
       {% if berichten %}
         <div class="flashes">

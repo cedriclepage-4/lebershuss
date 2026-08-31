@@ -61,6 +61,22 @@ body {
 .nav-admin { border: 1px solid rgba(255, 255, 255, .25); }
 .nav-uit { opacity: .8; }
 
+/* Eén stap terug, linksboven in de inhoud. De knop hoort bij de pagina eronder,
+   niet bij de balk erboven: dus lucht bovenaan, en de titel schuift er dichtbij.
+   Zonder die correctie plakt hij tegen de topbalk met een gat tot de titel. */
+.terug-knop {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin: 20px 0 0; padding: 6px 12px 6px 8px;
+  border: 1px solid var(--lijn); border-radius: 999px; background: #fff;
+  color: var(--stil); text-decoration: none; font-size: .9rem; font-weight: 600;
+}
+.terug-knop:hover { color: var(--inkt); border-color: var(--stil); }
+.terug-knop span[aria-hidden] { font-size: 1.2rem; line-height: 1; }
+.terug-knop + .held,
+.terug-knop + .flashes + .held { padding-top: 12px; }
+.terug-knop + .flashes { margin-top: 14px; }
+.beamer .terug-knop { display: none; }
+
 /* --------------------------------------------------------- held -- */
 .held { padding: 34px 0 18px; }
 .held h1 { margin: 0 0 6px; font-size: 1.9rem; color: var(--navy-donker); }
@@ -118,6 +134,32 @@ body {
   border-bottom: 0;                     /* de schaduw tekent de lijn nu */
 }
 .tabel-venster > .tabel tr:last-child td { border-bottom: 0; }
+
+/* Uitgelicht toernooi op de thuispagina. */
+.lopend-kaart {
+  display: flex; align-items: center; gap: 16px; text-decoration: none;
+  color: inherit; border-left: 4px solid var(--amber); margin-bottom: 18px;
+}
+.lopend-kaart:hover { background: #fffdf7; }
+.lopend-icoon { font-size: 2rem; line-height: 1; }
+.lopend-tekst { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.lopend-label {
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--amber-donker); font-weight: 700;
+}
+.lopend-tekst strong { font-size: 1.15rem; }
+.lopend-tekst small { color: var(--stil); }
+.lopend-actie { color: var(--amber-donker); font-weight: 600; white-space: nowrap; }
+@media (max-width: 560px) {
+  .lopend-actie { display: none; }
+}
+
+/* Wedstrijd die nog niet aan de beurt is: zichtbaar, maar zonder formulier. */
+.wacht-tekst {
+  background: #f8fafc; border: 1px solid var(--lijn); border-radius: 10px;
+  padding: 10px 14px; color: var(--stil); margin: 4px 0 0;
+}
+
 /* Naamveld + knop naast elkaar in een tabelcel: geen marge, niet afbreken. */
 .rij-form.nauw { flex-wrap: nowrap; gap: 6px; margin-bottom: 0; }
 .rij-form.nauw input[type="text"] { min-width: 8rem; }

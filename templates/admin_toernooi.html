@@ -28,19 +28,54 @@
 <div class="kaart">
   {% if teams %}
   <table class="tabel compact">
-    <thead><tr><th>Team</th><th class="wikkel">Spelers</th><th class="kol-elo">ELO</th>{% if potten_getoond %}<th class="verbergen-mobiel">Pot</th>{% endif %}<th></th></tr></thead>
+    <thead><tr><th>Team</th><th class="wikkel">Spelers</th><th class="kol-elo">Aura</th>{% if potten_aantal > 1 %}<th class="verbergen-mobiel">Pot</th>{% endif %}<th></th></tr></thead>
     <tbody>
       {% for team in teams %}
       <tr>
         <td class="naam">{{ team.naam }}</td>
         <td class="stil wikkel">{{ team.spelers }}</td>
         <td class="kol-elo">{{ team.elo|elo }}</td>
-        {% if potten_getoond %}<td class="verbergen-mobiel"><span class="pot-pil pot-{{ team.pot }}">{{ team.pot }}</span></td>{% endif %}
-        <td class="kol-num">
+        {% if potten_aantal > 1 %}<td class="verbergen-mobiel"><span class="pot-pil pot-{{ team.pot }}">{{ team.pot }}</span></td>{% endif %}
+        <td class="wikkel">
           {% if t['status'] == 'opzet' %}
           <form method="post" action="{{ url_for('toernooi_team_weg', toernooi_id=t['id'], team_id=team.id) }}">
             <button type="submit" class="knop gevaar klein">Weg</button>
           </form>
+          {% elif t['status'] == 'bracket' %}
+          {% set opties = terugtrek_opties.get(team.id, []) %}
+          <details class="wis-blok">
+            <summary>Komt niet opdagen…</summary>
+            {% if opties %}
+            <form method="post"
+                  action="{{ url_for('toernooi_team_terugtrekken', toernooi_id=t['id'], team_id=team.id) }}">
+              <p class="klein-tekst">Alle wedstrijden van <strong>{{ team.naam }}</strong> vervallen —
+                 ook forfaits die je al invulde. De nog niet gespeelde affiches worden
+                 opnieuw geloot zodat elk overblijvend team even veel échte wedstrijden speelt.
+                 De ronde die nu bezig is blijft staan.</p>
+              <p class="klein-tekst">Hoeveel wedstrijden speelt elk overblijvend team?</p>
+              <div class="keuze-groep">
+                {% for o in opties %}
+                <label class="radio">
+                  <input type="radio" name="doel" value="{{ o.doel }}"
+                         {{ 'checked' if o.standaard }}>
+                  <strong>{{ o.doel }}</strong>
+                  {%- if o.verschil > 0 %} <span class="pil">+{{ o.verschil }}, langer</span>
+                  {%- elif o.verschil < 0 %} <span class="pil">{{ o.verschil }}, korter</span>
+                  {%- else %} <span class="pil pil-actief">ongewijzigd</span>{% endif %}
+                  <span class="klein-tekst stil">— nog {{ o.nieuw }} wedstrijd(en),
+                    ± {{ o.minuten }} min</span>
+                </label>
+                {% endfor %}
+              </div>
+              <button type="submit" class="knop gevaar klein">Terugtrekken &amp; herloten</button>
+            </form>
+            {% else %}
+            <p class="klein-tekst conflict-tekst">Hiervoor is het te laat. Er valt geen
+               eerlijk schema meer te maken zonder de wedstrijden die nu bezig zijn af te
+               breken, en dat doen we niet. Laat de laatste ronde uitspelen; de forfaits
+               blijven staan zoals ze zijn.</p>
+            {% endif %}
+          </details>
           {% endif %}
         </td>
       </tr>
@@ -64,7 +99,7 @@
         <input type="checkbox" name="team" value="{{ team.id }}" {{ 'disabled' if team.botsing }}>
         <span>
           <strong>{{ team.naam }}</strong>
-          <span class="klein-tekst stil">{{ team.spelers }} · {{ team.elo|elo }} ELO</span>
+          <span class="klein-tekst stil">{{ team.spelers }} · {{ team.elo|elo }} Aura</span>
           {% if team.botsing %}<span class="klein-tekst conflict-tekst">⚠️ {{ team.botsing }}</span>{% endif %}
         </span>
       </label>
@@ -190,9 +225,6 @@
           {% endfor %}
         </select>
       </label>
-      <label>Aantal potten <input type="number" name="potten" min="1" max="8" value="{{ t['potten'] }}">
-        <span class="stil klein-tekst">Staat iedereen nog op dezelfde rating, dan wordt dit
-          genegeerd en vrij geloot.</span></label>
       <label>Minuten per wedstrijd <input type="number" name="slot" min="5" max="120" value="{{ t['slot_minuten'] }}"></label>
     </div>
     {% else %}
@@ -211,7 +243,7 @@
     {% else %}
     <p>Alles staat klaar: <strong>{{ teams|length }} teams</strong>,
        {{ t['bracket_ronden'] }} wedstrijden per team,
-       {% if teams|map(attribute='elo')|map('round', 6)|unique|list|length > 1 %}{{ t['potten'] }} potten,
+       {% if teams|map(attribute='elo')|map('round', 6)|unique|list|length > 1 %}4 potten,
        {% else %}vrije loting (iedereen op dezelfde rating),
        {% endif %}{{ t['ko_teams'] }} teams naar de knockout,
        {{ locaties|length }} tafel(s).</p>
@@ -243,7 +275,7 @@
 
 <div class="kaart">
   <h3>Toernooi verwijderen</h3>
-  <p class="stil klein-tekst">Alle wedstrijden van dit toernooi verdwijnen. De permanente ELO
+  <p class="stil klein-tekst">Alle wedstrijden van dit toernooi verdwijnen. De permanente Aura
      wordt daarna herberekend alsof ze nooit gespeeld zijn.</p>
   <form method="post" action="{{ url_for('toernooi_verwijderen', toernooi_id=t['id']) }}"
         data-confirm="“{{ t['name'] }}” definitief verwijderen?">

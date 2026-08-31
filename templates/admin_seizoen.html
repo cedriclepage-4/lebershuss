@@ -1,40 +1,80 @@
 {% extends "base.html" %}
-{% block titel %}Wedstrijden beheren{% endblock %}
+{% block titel %}{{ seizoen['name'] }} beheren{% endblock %}
 {% block inhoud %}
 
 <section class="held">
-  <h1>Leaguewedstrijden</h1>
-  <p>Plan wedstrijden, vul resultaten in en zet fouten recht. Toernooiwedstrijden
-     beheer je bij het toernooi zelf.</p>
+  <h1>{{ seizoen['name'] }} <span class="pil {{ 'pil-actief' if status == 'bezig' }}">{{ status }}</span></h1>
+  <p>📅 {{ seizoen['start_date']|dag }} t.e.m. {{ seizoen['end_date']|dag }}</p>
+  <p class="ruimte-boven">
+    <a class="knop" href="{{ url_for('seizoen_detail', seizoen_id=seizoen['id']) }}">Publieke pagina</a>
+    <a class="knop" href="{{ url_for('admin_seizoenen') }}">Terug naar alle seizoenen</a>
+  </p>
 </section>
 
 {% include "_admin_nav.html" %}
 
 {% if not league_zichtbaar %}
 <div class="kaart aandacht-kaart">
-  <p class="klein-tekst">🙈 Het leaguegedeelte staat uit: <strong>spelers zien deze
-     wedstrijden niet</strong> en kunnen ze ook niet melden. Zet het aan bij
-     {% if is_eigenaar %}<a class="profiel-link" href="{{ url_for('admin_instellingen') }}#league">Instellingen</a>{% else %}de eigenaar{% endif %}
-     wanneer je de league wil openstellen.</p>
+  <p class="klein-tekst">🙈 Het leaguegedeelte staat uit: <strong>spelers zien dit seizoen
+     niet</strong>. Je kan gerust alles klaarzetten; het wordt zichtbaar zodra de league
+     aan staat.</p>
 </div>
 {% endif %}
 
 <nav class="anker-nav">
-  <a href="#plannen">Plannen</a>
+  <a href="#speeldagen">Speeldagen ({{ speeldagen|length }})</a>
+  <a href="#plannen">Wedstrijd plannen</a>
   <a href="#openstaand">Openstaand ({{ gepland|length }})</a>
-  <a href="#gespeeld">Recent gespeeld</a>
+  <a href="#gespeeld">Gespeeld</a>
 </nav>
+
+<!-- ========================================================= speeldagen -->
+<h2 class="sectiekop" id="speeldagen">Speeldagen</h2>
+<div class="kaart">
+  <p class="stil klein-tekst">Een leaguewedstrijd hoort altijd bij een speeldag.
+     Maak er dus eerst eentje aan; daarna kan je hieronder wedstrijden inplannen.</p>
+  {% if speeldagen %}
+  <table class="tabel compact">
+    <thead><tr><th>Speeldag</th><th>Datum</th><th class="kol-num">Wedstrijden</th><th></th></tr></thead>
+    <tbody>
+      {% for sd in speeldagen %}
+      <tr>
+        <td class="naam">{{ sd['title'] }}</td>
+        <td>{{ sd['date']|dag }}</td>
+        <td class="kol-num">{{ sd['aantal_games'] }}</td>
+        <td class="kol-num">
+          {% if sd['aantal_games'] == 0 %}
+          <form method="post" action="{{ url_for('speeldag_verwijderen', speeldag_id=sd['id']) }}"
+                data-confirm="Speeldag “{{ sd['title'] }}” verwijderen?">
+            <button type="submit" class="knop gevaar klein">Verwijderen</button>
+          </form>
+          {% else %}<span class="stil klein-tekst">heeft wedstrijden</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="stil">Nog geen speeldagen in dit seizoen.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('speeldag_nieuw') }}" class="rij-form ruimte-boven">
+    <input type="hidden" name="seizoen" value="{{ seizoen['id'] }}">
+    <input type="text" name="titel" placeholder="Titel (leeg = Speeldag {{ speeldagen|length + 1 }})">
+    <input type="date" name="datum" min="{{ seizoen['start_date'] }}" max="{{ seizoen['end_date'] }}" required>
+    <button type="submit" class="knop">Speeldag toevoegen</button>
+  </form>
+</div>
 
 <!-- ============================================================ plannen -->
 <h2 class="sectiekop" id="plannen">Wedstrijd plannen</h2>
 <div class="kaart">
-  {% if not speeldag_opties %}
-  <p class="stil">Maak eerst een seizoen met minstens één speeldag aan bij
-     <a class="profiel-link" href="{{ url_for('admin_seizoenen') }}">Seizoenen</a>,
-     dan kan je wedstrijden plannen.</p>
+  {% if not speeldagen %}
+  <p class="stil">Maak hierboven eerst een speeldag aan, dan kan je wedstrijden plannen.</p>
   {% elif teams|length < 2 %}
   <p class="stil">Er zijn minstens 2 actieve teams nodig. Spelers maken zelf teams
-     aan via hun profiel (met een uitnodiging aan hun teamgenoot).</p>
+     aan via hun profiel (met een uitnodiging aan hun teamgenoot), of je zet er zelf
+     eentje klaar bij
+     <a class="profiel-link" href="{{ url_for('admin_spelers') }}#teams">Spelers &amp; teams</a>.</p>
   {% else %}
   <form method="post" action="{{ url_for('wedstrijd_nieuw') }}" class="plan-form">
     <div class="plan-raster">
@@ -57,8 +97,9 @@
     <div class="plan-onder">
       <label>Speeldag
         <select name="speeldag" required>
-          <option value="" disabled selected>Kies een speeldag…</option>
-          {% for sd in speeldag_opties %}<option value="{{ sd['id'] }}">{{ sd['title'] }} · {{ sd['seizoen'] }} ({{ sd['date']|dag }})</option>{% endfor %}
+          {% for sd in speeldagen %}
+          <option value="{{ sd['id'] }}" {{ 'selected' if loop.last }}>{{ sd['title'] }} ({{ sd['date']|dag }})</option>
+          {% endfor %}
         </select>
       </label>
       <label>Aanvangsuur
